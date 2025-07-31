@@ -1,3 +1,10 @@
+'''
+- Traverse all task directories and collect all HDF5 data file paths.
+- Read the /observations/qpos and /action data from each file sequentially and concatenate them into a large array.
+- Calculate the mean, standard deviation, minimum, and maximum values of the actions and states, and perform extreme clipping to prevent normalization errors caused by zero standard deviation.
+- Return these statistics for subsequent training and data preprocessing.
+'''
+
 from utils import find_all_hdf5, flatten_list
 import os
 path = "/media/rl/SanDisk PRO-BLAD/aloha_data/1_10"

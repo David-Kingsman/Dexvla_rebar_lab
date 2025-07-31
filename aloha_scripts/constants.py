@@ -1,8 +1,21 @@
+import pathlib
+
+''' 
+You have to add one entry in constants.py to specify the path of your data as follows.
+    'example_task_name': { # for local debug
+        'dataset_dir': [
+            '/path/to/task1', # define the path of the dataset
+        ],
+        'episode_len': 1000,  
+        'camera_names': ['left', 'right', 'wrist'] # keys corresponding to below h5 data structure
+    }
+'''
+### Task parameters
+DATA_DIR = "data" # '<put your data dir here>'
+
 TASK_CONFIGS = {
     'example_tasks': { # for local debug
-        'dataset_dir': [
-            "/media/rl/HDD/data/data/aloha_data/4_cameras_aloha/folding_shirt"
-        ],
+        'dataset_dir': [DATA_DIR + "/4_cameras_aloha/folding_shirt"],# replace with your real data path
         'episode_len': 1000,  
         'camera_names': ['cam_high', 'cam_left_wrist', 'cam_right_wrist'] # replacing with your real keys in h5py formatted data
     }
@@ -12,7 +25,11 @@ TASK_CONFIGS = {
 DT = 0.02
 JOINT_NAMES = ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
 START_ARM_POSE = [0, -0.96, 1.16, 0, -0.3, 0, 0.02239, -0.02239,  0, -0.96, 1.16, 0, -0.3, 0, 0.02239, -0.02239]
+
+XML_DIR = str(pathlib.Path(__file__).parent.resolve()) + '/assets/' # note: absolute path
+
 FPS = 50
+
 # Left finger position limits (qpos[7]), right_finger = -1 * left_finger
 MASTER_GRIPPER_POSITION_OPEN = 0.02417
 MASTER_GRIPPER_POSITION_CLOSE = 0.01244

@@ -1,4 +1,7 @@
 """
+Package single samples (such as a frame of image, action, text, etc.) 
+into batches so that they can be fed into the model for supervised training.
+
 Example usage:
 $ python3 script/compress_data.py --dataset_dir /scr/lucyshi/dataset/aloha_test
 """
@@ -61,7 +64,7 @@ def compress_dataset(input_dataset_path, output_dataset_path):
 
     print(f"Truncated dataset saved to {output_dataset_path}")
 
-
+# Function to save videos from the dataset
 def save_videos(video, dt, video_path=None):
     if isinstance(video, list):
         cam_names = list(video[0].keys())
@@ -100,13 +103,13 @@ def save_videos(video, dt, video_path=None):
         out.release()
         print(f'Saved video to: {video_path}')
 
- 
+# Function to load the first episode video from the dataset
 def load_and_save_first_episode_video(dataset_dir, video_path):
     dataset_name = 'episode_0'
     _, _, _, _, image_dict = load_hdf5(dataset_dir, dataset_name)
     save_videos(image_dict, DT, video_path=video_path)
 
-
+# Function to load HDF5 dataset
 def load_hdf5(dataset_dir, dataset_name):
     dataset_path = os.path.join(dataset_dir, dataset_name + '.hdf5')
     if not os.path.isfile(dataset_path):

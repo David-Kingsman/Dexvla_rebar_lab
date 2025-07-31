@@ -6,6 +6,22 @@ import gc
 import numpy as np
 import os
 
+
+'''
+# Data collation tool, used to package single samples (such as a single image frame, action, text, etc.) into batches for feeding into the model for supervised training.
+# Alignment and batch processing of multimodal input;Unified organization of multimodal data during end-to-end training
+
+- Batch concatenates and pads the text, label, image/video, action, and state fields in input instances (a dictionary where each element represents a sample), ensuring consistent format and length across all data within the batch.
+
+- Supports both video and image input modes, automatically processing corresponding data fields.
+
+- Generates an attention mask to distinguish valid tokens and padding.
+
+- Organizes multimodal data such as actions and states into batch tensors.
+
+- Cleans unused variables and video memory to prevent memory leaks.
+'''
+
 @dataclass
 class Qwen2VLADataCollatorForSupervisedDataset(object):
     """Collate examples for supervised fine-tuning."""

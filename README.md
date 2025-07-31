@@ -32,10 +32,12 @@ Install Packages
 ```Shell
 conda create -n dexvla python=3.10 -y
 conda activate dexvla
-pip install --upgrade pip  # 
+pip install --upgrade pip  
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia -y
 pip install -r requirements.txt
 cd policy_heads
 pip install -e .
+
 ```
 For training acceleration, please install [flash_attention](https://github.com/Dao-AILab/flash-attention).
 ```shell
@@ -61,6 +63,8 @@ root
       |-qpos (100,7)
       |-qvel (100,7)
 ```
+
+
 2. You have to add one entry in [constants.py](https://github.com/juruobenruo/DexVLA/blob/main/aloha_scripts/constants.py) to specify the path of your data as follows.
 ```python
     'example_task_name': { # for local debug
@@ -93,14 +97,18 @@ We released our pretrained weights of ScaleDP-H which is trained after Stage1. N
 | ScaleDP-H (~1B)   | [huggingface](https://huggingface.co/lesjie/scale_dp_h)  |
 | ScaleDP-L (~400M) | [huggingface](https://huggingface.co/lesjie/scale_dp_l)  |
 
+
+
 ## 🦾Train
 The training script are "scripts/stage2_train.sh" and "scripts/stage3_train.sh". And you need to change following parameters:
+
 1. **OUTPUT** :refers to the save directory for training, which must include the keyword "qwen2"(and optionally "lora"). If LoRA training is used, the name must include "lora" (e.g., "qwen2_lora").
 2. **task_name** :refers to the tasks used for training, which should be corresponded to "your_task_name" in aloha_scripts/constant.py
 3. **model_name_or_path** :path to the pretrained VLM weights
 
 Other hyperparameters like "batch_size", "save_steps" could be customized according to your computation resources.
 Start training by following commands:
+
 
 Train stage2. Training on large amount of tasks.
 And following hyper-parameters must be set as:
@@ -111,6 +119,7 @@ And following hyper-parameters must be set as:
 ```shell
 ./scripts/train_dexvla_stage2.sh 
 ```
+
 Train stage3. Post-training on target dexterous tasks. 
 And following hyper-parameters must be set as:
 1. **MNOP** :Path to trained DexVLA of Stage2.
@@ -118,6 +127,8 @@ And following hyper-parameters must be set as:
 ```shell
 ./scripts/train_dexvla_stage3.sh 
 ```
+
+
 
 ## Evaluation
 **❗❗** Make sure your trained checkpoint dir has two files: "preprocessor_config.json" and "chat_template.json".

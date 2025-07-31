@@ -10,7 +10,7 @@ import h5py
 
 import torch
 import collections
-import tensorflow_datasets as tfds
+# import tensorflow_datasets as tfds
 import numpy as np
 import tkinter as tk
 from tkinter import simpledialog
@@ -18,6 +18,8 @@ from PIL import Image, ImageTk
 import time
 import argparse
 
+# Constants for colors
+# Batch read RGB images in folders and convert them into arrays
 def get_image_list_np(img_rgb_dir_path, remove_index_list):
     cur_camera_rgb_list = []
     img_name_list = os.listdir(img_rgb_dir_path)
@@ -31,10 +33,10 @@ def get_image_list_np(img_rgb_dir_path, remove_index_list):
 
         # (w 640, h 480)
         img_frame = Image.open(img_path).convert('RGB')
-        # print(f'cur frame {img_frame} size: {img_frame.size}')
+        print(f'cur frame {img_frame} size: {img_frame.size}')
         # (480, 640, 3)
         img_np = np.array(img_frame)
-        # print(f'cur np {img_path} size: {img_np.shape}')
+        print(f'cur np {img_path} size: {img_np.shape}')
         cur_camera_rgb_list.append(img_np)
 
     cur_camera_rgb_np = np.array(cur_camera_rgb_list)
@@ -44,7 +46,7 @@ def get_image_list_np(img_rgb_dir_path, remove_index_list):
 
     return cur_camera_rgb_np
 
-
+# Function to plot smooth actions (Generate visualization (3D motion curves))
 def plot_smooth_action(traj_act_xyz_np, fig_name):
     import matplotlib.pyplot as plt
     plt.figure(figsize=(12, 4))
@@ -68,7 +70,7 @@ def plot_smooth_action(traj_act_xyz_np, fig_name):
     plt.savefig(figure_path)
     plt.clf()
 
-
+# Function to print the structure of an h5py group
 def print_h5_structure(group, indent=0):
     for name in group:
         item = group[name]
@@ -81,7 +83,7 @@ def print_h5_structure(group, indent=0):
         else:
             print(" " * indent + f"Unknown item: {name}")
 
-
+# Function to print the structure of a dictionary
 def print_dict_structure(cur_dict, indent=0):
     for name in cur_dict.keys():
         item = cur_dict[name]
@@ -94,7 +96,7 @@ def print_dict_structure(cur_dict, indent=0):
         else:
             print(" " * indent + f"Unknown item: {name}")
 
-
+# Function to convert all torch tensors in a nested structure to numpy arrays
 def to_numpy(x):
     """
     Converts all torch tensors in nested dictionary or list or tuple to
@@ -123,7 +125,7 @@ def to_numpy(x):
         }
     )
 
-
+# Function to recursively apply functions to a nested dictionary or list or tuple
 def recursive_dict_list_tuple_apply(x, type_func_dict):
     """
     Recursively apply functions to a nested dictionary or list or tuple, given a dictionary of
@@ -163,6 +165,7 @@ def recursive_dict_list_tuple_apply(x, type_func_dict):
             #     'Cannot handle data type %s' % str(type(x)))
 
 
+# Function to convert rotation matrices to 6D rotation representation
 def matrix_to_rotation_6d(matrix: torch.Tensor) -> torch.Tensor:
     """
     Converts rotation matrices to 6D rotation representation by Zhou et al. [1]
@@ -180,6 +183,7 @@ def matrix_to_rotation_6d(matrix: torch.Tensor) -> torch.Tensor:
     return matrix[..., :2, :].clone().reshape(batch_dim + (6,))
 
 
+# Function to convert euler angles to 6D rotation representation
 def euler_angles_to_rot_6d(euler_angles, convention="XYZ"):
     """
     Converts tensor with rot_6d representation to euler representation.
@@ -189,6 +193,7 @@ def euler_angles_to_rot_6d(euler_angles, convention="XYZ"):
     return rot_6d
 
 
+# Function to compute the rotation matrices for Euler angles
 def _axis_angle_rotation(axis: str, angle: torch.Tensor) -> torch.Tensor:
     """
     Return the rotation matrices for one of the rotations about an axis
@@ -201,7 +206,6 @@ def _axis_angle_rotation(axis: str, angle: torch.Tensor) -> torch.Tensor:
     Returns:
         Rotation matrices as tensor of shape (..., 3, 3).
     """
-
     cos = torch.cos(angle)
     sin = torch.sin(angle)
     one = torch.ones_like(angle)
@@ -219,6 +223,7 @@ def _axis_angle_rotation(axis: str, angle: torch.Tensor) -> torch.Tensor:
     return torch.stack(R_flat, -1).reshape(angle.shape + (3, 3))
 
 
+# Function to convert euler angles to rotation matrices
 def euler_angles_to_matrix(euler_angles: torch.Tensor, convention: str) -> torch.Tensor:
     """
     Convert rotations given as Euler angles in radians to rotation matrices.
@@ -248,6 +253,7 @@ def euler_angles_to_matrix(euler_angles: torch.Tensor, convention: str) -> torch
     return torch.matmul(torch.matmul(matrices[0], matrices[1]), matrices[2])
 
 
+# Function to convert h5py group to a nested dictionary of numpy arrays
 def convert_h5py2np_dict(group, state_np_dict, indent=0):
     for name in group:
         item = group[name]
@@ -270,6 +276,7 @@ def convert_h5py2np_dict(group, state_np_dict, indent=0):
 def print_name(name):
     print(name)
 
+# Function to generate h5 file from observations and actions
 def generate_h5(obs_replay, action_replay, cfg, total_traj_cnt, act_root_dir_path, edit_flag):
     data_dict = {
         '/observations/qpos': obs_replay['qpos'],
