@@ -7,7 +7,7 @@ import time
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 os.environ['DEVICE'] = "cuda"
-os.environ["WANDB_DISABLED"] = "true"
+os.environ["WANDB_DISABLED"] = "true" # disable wandb
 
 from data_utils.utils import load_data  # data functions
 from data_utils.utils import set_seed  # helper functions
@@ -51,7 +51,7 @@ class ModelArguments:
     load_pretrain_dit: bool = field(default=False) # whether to load weights of pretrained diffusion head
     pretrain_dit_path: Optional[str] = field(default=None) # path to pretrained diffusion head, used when load_pretrain_dit is True
 
-    is_tinyvla: bool = field(default=False)
+    is_tinyvla: bool = field(default=False)  # input states into VLM
 
 @dataclass
 class DataArguments:

@@ -28,14 +28,14 @@ deepspeed --master_port 29604 --num_gpus=8 --num_nodes=1 ./train_vla.py \
   --state_dim 14 \
   --flash_attn True \
   --chunk_size 50 \
-  --load_pretrain_dit True \
-  --pretrain_dit_path $DIT_PRETRAIN \
+  --load_pretrain_dit True \    # ← Load pre-trained ScaleDP weights
+  --pretrain_dit_path $DIT_PRETRAIN \    # ← Path to the pre-trained ScaleDP weights
   --policy_head_type $ACTION_HEAD \
   --policy_head_size "ScaleDP_H" \
   --image_size_stable "(320,240)" \
   --image_size_wrist "(320,240)" \
   --task_name ${TASKNAME} \
-  --model_name_or_path $MNOP \
+  --model_name_or_path $MNOP \  # Qwen2-VL-2B weights path
   --version v0 \
   --tune_mm_mlp_adapter True \
   --freeze_vision_tower False \  # ← Unfreeze the vision tower for fine-tuning, can be frozen for inference
