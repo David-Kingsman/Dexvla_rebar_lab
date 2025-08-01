@@ -13,8 +13,8 @@ MNOP=/home/zekaijin/DexVLA/output/train_dexvla_stage2/checkpoint-10000
 # Task name
 TASKNAME=rebar_insertion_tasks
 
-# Output directory
-OUTPUT=/home/zekaijin/DexVLA/output/train_dexvla_stage3   # e.g. /home/zekaijin/DexVLA/output/train_dexvla_stage2
+# Output directory ("lora" must be included when training LoRA)
+OUTPUT=/home/zekaijin/DexVLA/output/train_dexvla_stage3  
 
 deepspeed --master_port 29604 --num_gpus=8 --num_nodes=1 ./train_vla.py \
   --deepspeed scripts/zero2.json \

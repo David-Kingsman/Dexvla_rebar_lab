@@ -17,7 +17,7 @@ MNOP=/home/zekaijin/DexVLA/models/Qwen2-VL-2B-Instruct
 # Task name
 TASKNAME=rebar_insertion_tasks
 
-# Output directory
+# Output directory ("lora" must be included when training LoRA)
 OUTPUT=/home/zekaijin/DexVLA/output/train_dexvla_stage2
 
 deepspeed --master_port 29604 --num_gpus=8 --num_nodes=1 ./train_vla.py \

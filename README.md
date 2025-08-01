@@ -294,12 +294,14 @@ This is a bug in evaluation which not affect the training process. Sorry about t
 # Diffusion-VLA
 Our DexVLA is built on Diffusion-VLA(DiVLA) which can be found [here](https://diffusion-vla.github.io/). Paper can be found in [Citation](#citation). You can train Diffusion-VLA with "./scripts/train_divla.sh".
 The mainly differences are as follows:
-1. DiVLA utilizes Unet-based diffusion policy as policy head of VLA.
-2. DiVLA has no three-stage training recipe. 
+1. DiVLA utilizes Unet-based diffusion policy as policy head of VLA while DexVLA uses ScaleDP (Transformer-based dp) as the policy header
+2. DiVLA has no three-stage training recipe while DexVLA has three stages of training. The training is more complex but the effect is better.
 
 
 # ScaleDP
 DexVLA utilizes ScaleDP as diffusion policy head that the main structure of ScaleDP can be found [here](https://scaling-diffusion-policy.github.io/).  Paper can be found in [Citation](#citation). The code can be found in this [dir](https://github.com/juruobenruo/DexVLA/tree/main/policy_heads/models/transformer_diffusion). There are only two files, one for configuration and the other is model structure.
+
+
 
 
 ## Acknowledgement
