@@ -7,11 +7,11 @@ DexVLA: Vision-Language Model with Plug-In Diffusion Expert for Visuomotor Polic
   [![arXiv](https://img.shields.io/badge/Arxiv-2502.05855-b31b1b.svg?logo=arXiv)](https://arxiv.org/abs/2502.05855)
   
 
-
 ## 📰 News
 * **`Mar. 11th, 2025`**: Add a script for training DiVLA.
 * **`Feb. 24th, 2025`**: We released our Stage 1 trained ScaleDP-H !!!
 * **`Feb. 17th, 2025`**: **DexVLA** is out! **Paper** can be found [here](https://arxiv.org/abs/2502.05855). The **project web** can be found [here](https://dex-vla.github.io/).
+
 
 ## Contents
 - [Install](#install)
@@ -23,33 +23,36 @@ DexVLA: Vision-Language Model with Plug-In Diffusion Expert for Visuomotor Polic
 - [ScaleDP](#scaledp)
 
 ## Install
-
 1. Clone this repository and navigate to diffusion-vla folder
 ```bash
 git clone https://github.com/juruobenruo/dexvla.git
 ```
+
 Install Packages
 ```Shell
 conda create -n dexvla python=3.10 -y
 conda activate dexvla
 pip install --upgrade pip  
-conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia -y
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
 pip install -r requirements.txt
 cd policy_heads
 pip install -e .
-
 ```
+
 For training acceleration, please install [flash_attention](https://github.com/Dao-AILab/flash-attention).
+
 ```shell
-pip install flash-attn --no-build-isolation
+pip install flash-attn --no-build-isolation 
 ```
 
 ## Data Preparation
 We provide an example data [here](https://huggingface.co/datasets/lesjie/dexvla_example_data). You can download it and run the whole pipeline quickly.
-1. Our data format is the same as [act](https://github.com/MarkFzp/act-plus-plus), so you need to transfer your data into h5py format. You can refer to function "generate_h5" in [data_preprocess_scripts/rlds_to_h5py.py](
-https://github.com/juruobenruo/DexVLA/blob/main/data_preprocess_scripts/rlds_to_h5py.py) which is used to transfer the data from rlds format to h5py format.
+
+1. Our data format is the same as [act](https://github.com/MarkFzp/act-plus-plus), so you need to transfer your data into h5py format. You can refer to function "generate_h5" in [data_preprocess_scripts/rlds_to_h5py.py](https://github.com/juruobenruo/DexVLA/blob/main/data_preprocess_scripts/rlds_to_h5py.py) which is used to transfer the data from rlds format to h5py format.
+
 ```angular2html
-# h5 data structure
+# hdf5 data structure
 root
   |-action (100,10)
   |-language_raw (1,)
@@ -64,7 +67,6 @@ root
       |-qvel (100,7)
 ```
 
-
 2. You have to add one entry in [constants.py](https://github.com/juruobenruo/DexVLA/blob/main/aloha_scripts/constants.py) to specify the path of your data as follows.
 ```python
     'example_task_name': { # for local debug
@@ -76,33 +78,67 @@ root
     }
 ```
 
+## Training Data Processing
+
+This step performs data preprocessing, converting the original RoboTwin 2.0 data into the format required for DexVLA training. The `expert_data_num` parameter specifies the number of trajectory pairs to be used as training data.
+
+```bash
+python process_data.py ${task_name} ${task_config} ${expert_data_num}
+# python process_data.py beat_block_hammer demo_randomized 50
+```
+
+If success, you will find the data in the `policy/Dexvla/data/sim_${task_name}/${setting}_${expert_data_num}` folder.
+
+
+
 ## 🤗Download Pretrained Weights
 ### Download official Qwen2_VL weights
 We construct the VLM backbone by integrating Qwen2-VL-2B, a powerful and efficient model, into our framework. 
-The Qwen2-VL 2B serves as the core of our architecture, providing robust capabilities 
-for vision-language tasks. We use off-the-shelf Qwen2-VL model proposed 
-in [Qwen2-VL](https://arxiv.org/pdf/2409.12191) without any post training on VLM itself. You can download the official weights from this link:
+The Qwen2-VL 2B serves as the core of our architecture, providing robust capabilities for vision-language tasks. We use off-the-shelf Qwen2-VL model proposed in [Qwen2-VL](https://arxiv.org/pdf/2409.12191) without any post training on VLM itself. You can download the official weights from this link:
+
 
 | Model               | Link                                                           |
 |---------------------|----------------------------------------------------------------|
 | Qwen2-VL (~2B)      | [huggingface](https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct) |
 
-**❗❗** After downloading the standard weights, you have to replace the official "config.json"
-with our "docs/config.json" designed for VLA.
+
+**❗❗** After downloading the standard weights, you have to replace the official "config.json" with our "docs/config.json" designed for VLA.
+
+```bash
+# Clone the Qwen2-VL-2B weights to the ~/models directory (4 GB)
+mkdir -p ~/DexVLA/models
+cd ~/models
+git lfs install   
+git clone https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct
+# The config provided by DexVLA overrides the official one
+cp /path/to/DexVLA/docs/config.json \
+   ~/models/Qwen2-VL-2B-Instruct/config.json
+```
+
 ### Download our pretrained ScaleDP-H weights(Stage 1)
 We released our pretrained weights of ScaleDP-H which is trained after Stage1. Now you can download the weights and directly finetuning your data on Stage 2.
 
-| Model             | Link                                                           |
-|-------------------|----------------------------------------------------------------|
+| Model             | Link                                                     |
+|-------------------|----------------------------------------------------------|
 | ScaleDP-H (~1B)   | [huggingface](https://huggingface.co/lesjie/scale_dp_h)  |
 | ScaleDP-L (~400M) | [huggingface](https://huggingface.co/lesjie/scale_dp_l)  |
 
+```bash
+git lfs install
 
+# ScaleDP-H (~1B)
+git clone https://huggingface.co/lesjie/scale_dp_h
+
+# ScaleDP-L (~400M)
+git clone https://huggingface.co/lesjie/scale_dp_l
+```
 
 ## 🦾Train
+
 The training script are "scripts/stage2_train.sh" and "scripts/stage3_train.sh". And you need to change following parameters:
 
-1. **OUTPUT** :refers to the save directory for training, which must include the keyword "qwen2"(and optionally "lora"). If LoRA training is used, the name must include "lora" (e.g., "qwen2_lora").
+1. **OUTPUT** : refers to the save directory for training, which must include the keyword "qwen2"(and optionally "lora"). 
+*** If LoRA training is used, the name must include "lora" (e.g., "qwen2_lora").
 2. **task_name** :refers to the tasks used for training, which should be corresponded to "your_task_name" in aloha_scripts/constant.py
 3. **model_name_or_path** :path to the pretrained VLM weights
 
@@ -110,8 +146,7 @@ Other hyperparameters like "batch_size", "save_steps" could be customized accord
 Start training by following commands:
 
 
-Train stage2. Training on large amount of tasks.
-And following hyper-parameters must be set as:
+Train stage2. Training on large amount of tasks. And following hyper-parameters must be set as:
 1. **load_pretrain_dit** : True
 2. **DIT_PRETRAIN** :Path to pretrained policy head(ScaleDP).
 3. **MNOP** :Path to official Qwen2_vl weights(VLM backbone).
@@ -120,21 +155,19 @@ And following hyper-parameters must be set as:
 ./scripts/train_dexvla_stage2.sh 
 ```
 
-Train stage3. Post-training on target dexterous tasks. 
-And following hyper-parameters must be set as:
-1. **MNOP** :Path to trained DexVLA of Stage2.
+Train stage3. Post-training on target dexterous tasks. And following hyper-parameters must be set as:
 
+1. **MNOP** :Path to trained DexVLA of Stage2.
 ```shell
 ./scripts/train_dexvla_stage3.sh 
 ```
-
-
 
 ## Evaluation
 **❗❗** Make sure your trained checkpoint dir has two files: "preprocessor_config.json" and "chat_template.json".
 If not, please copy them from downloaded Qwen2_vl weights or this [link](https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct/tree/main).
 
 You can refer to our evaluation script [smart_eval_agilex.py](https://github.com/juruobenruo/DexVLA/blob/main/evaluate/smart_eval_agilex.py) to evaluate your DexVLA.
+
 
 ## ⚠️ Trouble Shooting
 ### 1."TypeError: _batch_encode_plus() got an unexpected keyword argument 'images'". 
@@ -164,6 +197,8 @@ Traceback (most recent call last):
     batched_output = self._batch_encode_plus(
 TypeError: _batch_encode_plus() got an unexpected keyword argument 'images'
 ~~~
+
+
 ### 2. <font color=red>CUDA OOM</font>. 
 For OOM problem, we provide three ways to save CUDA memory. You can use only one solution or all of them. And here we listed the training speed, GPU memory for all three solutions.
 Notably, all results are evaluated on **single** A6000(46G) with batch_size 2. 
@@ -176,6 +211,7 @@ Notably, all results are evaluated on **single** A6000(46G) with batch_size 2.
 | local_debug_python.sh    | -                 | ✔️       | -               | 1.09s/iter     | 24G         |
 | local_debug_python.sh    | -                 | -        | ✔️              | 1.01s/iter     | 33G         |
 | local_debug_python.sh    | -                 | -        | -               | 1.1s/iter      | 38G         |
+
 #### Deepspeed offload
 Deepspeed allows to offload optimizer part to cpu which saves a lot of cuda memory. You can enbale the offload by adding following part in scripts/zero2.json. 
 Please make sure your GCC version > 9.
@@ -194,7 +230,9 @@ Please make sure your GCC version > 9.
         //###################################
     },
 ~~~
+
 #### LoRA Finetune
+
 Our scripts facilitate LoRA (Low-Rank Adaptation) fine-tuning of the Vision-Language Model (VLM) backbone. This approach is effective in reducing GPU memory usage. Meanwhile, the policy head continues to undergo full parameter training.
 
 To enable LoRA, you can set the following hyperparameters within the training scripts:
@@ -206,12 +244,16 @@ To enable LoRA, you can set the following hyperparameters within the training sc
   --freeze_backbone True \
   ...
 ~~~
+
 **Notice:** After LoRA finetune, you need to process the checkpoint files as follows:
+
 ~~~ shell
 cd /path/to/finetuned/dir/checkpoint-xxxx
 python ./zero_to_fp32.py ./ ./non_lora_trainables.bin
 ~~~
+
 For evaluation, you have to specify following arguments in ``evaluate/smart_eval_agilex.py``:
+
 ~~~
 "model_base": None, # path to base model
 "enable_lora": True, 
@@ -221,13 +263,17 @@ For evaluation, you have to specify following arguments in ``evaluate/smart_eval
 Our DexVLA consists of two parts: the VLM backbone and the ScaleDP policy head. In our paper, we utilize a 1B - sized ScaleDP. Additionally, we recommend that users employ a smaller one, such as a 410M - sized ScaleDP, to save memory.
 
 By setting the following hyperparameters:
+
 ~~~ shell
   ...
   --policy_head_size "ScaleDP_L" \
   ...
 ~~~
+
 ### 3. Action value is <font color=red>Nan</font> during inference which happens at the last denoising in "policy_heads/models/transformer_diffusion/modeling_dit_diffusion.py". 
+
 This is a precision overflow problem in "[DDIMScheduler](https://github.com/huggingface/diffusers/blob/v0.11.1/src/diffusers/schedulers/scheduling_ddim.py)" from diffusers.schedulers.scheduling_ddim. The easiest way is adding a line in "scheduling_ddim.py"
+
 ~~~python
         ###other code###
         else:
@@ -244,20 +290,24 @@ This is a precision overflow problem in "[DDIMScheduler](https://github.com/hugg
 ### 4. Robot performs <font color=red>random actions</font> when evaluation.
 This is a bug in evaluation which not affect the training process. Sorry about that and we have fixed this in [23e29e1](https://github.com/juruobenruo/DexVLA/commit/23e29e16a65eac72d940d55f5475e20c996f1e42).
 
+
 # Diffusion-VLA
 Our DexVLA is built on Diffusion-VLA(DiVLA) which can be found [here](https://diffusion-vla.github.io/). Paper can be found in [Citation](#citation). You can train Diffusion-VLA with "./scripts/train_divla.sh".
 The mainly differences are as follows:
 1. DiVLA utilizes Unet-based diffusion policy as policy head of VLA.
 2. DiVLA has no three-stage training recipe. 
 
+
 # ScaleDP
 DexVLA utilizes ScaleDP as diffusion policy head that the main structure of ScaleDP can be found [here](https://scaling-diffusion-policy.github.io/).  Paper can be found in [Citation](#citation). The code can be found in this [dir](https://github.com/juruobenruo/DexVLA/tree/main/policy_heads/models/transformer_diffusion). There are only two files, one for configuration and the other is model structure.
+
 
 ## Acknowledgement
 We build our project based on:
 - [LLaVA](https://github.com/haotian-liu/LLaVA): an amazing open-sourced project for vision language assistant
 - [act-plus-plus](https://github.com/haotian-liu/LLaVA): an amazing open-sourced project for robotics visuomotor learning
 - [Miphi](https://github.com/zhuyiche/llava-phi): an amazing open-sourced project for tiny vision language model
+
 
 ## Citation
 
