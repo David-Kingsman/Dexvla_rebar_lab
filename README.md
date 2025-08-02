@@ -1,18 +1,6 @@
 <h1 align="center">
 DexVLA: Vision-Language Model with Plug-In Diffusion Expert for Visuomotor Policy Learning</h1>
 
-![](./docs/dexvla_banner.gif)
-
-* **DexVLA: Vision-Language Model with Plug-In Diffusion Expert for Visuomotor Policy Learning** <br>
-  [![arXiv](https://img.shields.io/badge/Arxiv-2502.05855-b31b1b.svg?logo=arXiv)](https://arxiv.org/abs/2502.05855)
-  
-
-## 📰 News
-* **`Mar. 11th, 2025`**: Add a script for training DiVLA.
-* **`Feb. 24th, 2025`**: We released our Stage 1 trained ScaleDP-H !!!
-* **`Feb. 17th, 2025`**: **DexVLA** is out! **Paper** can be found [here](https://arxiv.org/abs/2502.05855). The **project web** can be found [here](https://dex-vla.github.io/).
-
-
 ## Contents
 - [Install](#install)
 - [Data Preparation](#data-preparation)
@@ -46,7 +34,11 @@ For training acceleration, please install [flash_attention](https://github.com/D
 pip install flash-attn --no-build-isolation 
 ```
 
+
+
 ## Data Preparation
+
+### Example data and data structure
 We provide an example data [here](https://huggingface.co/datasets/lesjie/dexvla_example_data). You can download it and run the whole pipeline quickly.
 
 1. Our data format is the same as [act](https://github.com/MarkFzp/act-plus-plus), so you need to transfer your data into h5py format. You can refer to function "generate_h5" in [data_preprocess_scripts/rlds_to_h5py.py](https://github.com/juruobenruo/DexVLA/blob/main/data_preprocess_scripts/rlds_to_h5py.py) which is used to transfer the data from rlds format to h5py format.
@@ -67,7 +59,8 @@ root
       |-qvel (100,7)
 ```
 
-2. You have to add one entry in [constants.py](https://github.com/juruobenruo/DexVLA/blob/main/aloha_scripts/constants.py) to specify the path of your data as follows.
+### Configurations
+2. You have to add one entry in [constants.py](https://github.com/juruobenruo/DexVLA/blob/main/aloha_scripts/constants.py) to specify the path of your data as fpip uninstall torch torchvision torchaudioollows.
 ```python
     'example_task_name': { # for local debug
         'dataset_dir': [
@@ -78,17 +71,24 @@ root
     }
 ```
 
-## Training Data Processing
+### Data Processing
 
-This step performs data preprocessing, converting the original RoboTwin 2.0 data into the format required for DexVLA training. The `expert_data_num` parameter specifies the number of trajectory pairs to be used as training data.
+This step performs data preprocessing, converting the original raw data into the format required for DexVLA training. The `expert_data_num` parameter specifies the number of trajectory pairs to be used as training data.
 
 ```bash
-python process_data.py ${task_name} ${task_config} ${expert_data_num}
-# python process_data.py beat_block_hammer demo_randomized 50
+# convert to hdf5 
+python data_preprocess_scripts/process_data.py
+
+# To visualize HDF5's state-action pair and visual observations 
+python visualize_episodes_dexvla.py --dataset_dir data/rebar_insertion_hdf5/ --episode_idx 0 --video 
 ```
 
-If success, you will find the data in the `policy/Dexvla/data/sim_${task_name}/${setting}_${expert_data_num}` folder.
+### Data Utils
 
+This step checks the integrity of the processed data before training
+```bash
+python data_utils/check_data_integrity.py
+```
 
 
 ## 🤗Download Pretrained Weights
@@ -102,7 +102,7 @@ The Qwen2-VL 2B serves as the core of our architecture, providing robust capabil
 | Qwen2-VL (~2B)      | [huggingface](https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct) |
 
 
-**❗❗** After downloading the standard weights, you have to replace the official "config.json" with our "docs/config.json" designed for VLA.
+**❗❗** After downloading the standard weights, you have to replace the official "config.json" with our "configs/config.json" designed for VLA.
 
 ```bash
 # Clone the Qwen2-VL-2B weights to the ~/models directory (4 GB)
@@ -111,7 +111,7 @@ cd ~/models
 git lfs install   
 git clone https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct
 # The config provided by DexVLA overrides the official one
-cp /path/to/DexVLA/docs/config.json \
+cp /path/to/DexVLA/configs/config.json \
    ~/models/Qwen2-VL-2B-Instruct/config.json
 ```
 
@@ -123,6 +123,7 @@ We released our pretrained weights of ScaleDP-H which is trained after Stage1. N
 | ScaleDP-H (~1B)   | [huggingface](https://huggingface.co/lesjie/scale_dp_h)  |
 | ScaleDP-L (~400M) | [huggingface](https://huggingface.co/lesjie/scale_dp_l)  |
 
+
 ```bash
 git lfs install
 
@@ -132,6 +133,7 @@ git clone https://huggingface.co/lesjie/scale_dp_h
 # ScaleDP-L (~400M)
 git clone https://huggingface.co/lesjie/scale_dp_l
 ```
+
 
 ## 🦾Train
 

@@ -1,0 +1,74 @@
+{
+  "run001": {
+    "total_frames": 300,
+    "base_instruction": "Insert the rebar into the target position",
+    "substep_reasonings": [
+      {
+        "start_frame": 0,
+        "end_frame": 50,
+        "reasoning": "Position the gripper above the rebar"
+      },
+      {
+        "start_frame": 51,
+        "end_frame": 120,
+        "reasoning": "Approach and grasp the rebar firmly"
+      },
+      {
+        "start_frame": 121,
+        "end_frame": 200,
+        "reasoning": "Lift the rebar and move towards target"
+      },
+      {
+        "start_frame": 201,
+        "end_frame": 280,
+        "reasoning": "Align the rebar with the insertion hole"
+      },
+      {
+        "start_frame": 281,
+        "end_frame": 350,
+        "reasoning": "Insert the rebar into the hole"
+      },
+      {
+        "start_frame": 351,
+        "end_frame": 395,
+        "reasoning": "Push the rebar deeper and verify insertion"
+      }
+    ]
+  },
+  "run002": {
+    "total_frames": 324,
+    "base_instruction": "Insert the rebar into the target position",
+    "substep_reasonings": [
+      {
+        "start_frame": 0,
+        "end_frame": 40,
+        "reasoning": "Position the gripper above the rebar"
+      },
+      {
+        "start_frame": 41,
+        "end_frame": 100,
+        "reasoning": "Approach and grasp the rebar firmly"
+      },
+      {
+        "start_frame": 101,
+        "end_frame": 180,
+        "reasoning": "Lift the rebar and move towards target"
+      },
+      {
+        "start_frame": 181,
+        "end_frame": 250,
+        "reasoning": "Align the rebar with the insertion hole"
+      },
+      {
+        "start_frame": 251,
+        "end_frame": 300,
+        "reasoning": "Insert the rebar into the hole"
+      },
+      {
+        "start_frame": 301,
+        "end_frame": 323,
+        "reasoning": "Complete insertion and release"
+      }
+    ]
+  }
+}

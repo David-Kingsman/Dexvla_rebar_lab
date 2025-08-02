@@ -172,6 +172,5 @@ cython_debug/
 
 
 # scripts recent edits
-process_data.py
 models/
 flash-attention/

@@ -15,9 +15,9 @@ DATA_DIR = "data" # '<put your data dir here>'
 
 TASK_CONFIGS = {
     'rebar_insertion_tasks': { # for local debug
-        'dataset_dir': [DATA_DIR + "/4_cameras_aloha/folding_shirt"],# replace with your real data path
-        'episode_len': 1000,  
-        'camera_names': ['cam_high', 'cam_left_wrist', 'cam_right_wrist'] # replacing with your real keys in h5py formatted data
+        'dataset_dir': [DATA_DIR + "/rebar_insertion_demo"],# replace with your real data path
+        'episode_len': 2000,  
+        'camera_names': ["webcam_1","webcam_2"] # replacing with your real keys in h5py formatted data
     }
 }
 
@@ -29,6 +29,7 @@ START_ARM_POSE = [0, -0.96, 1.16, 0, -0.3, 0, 0.02239, -0.02239,  0, -0.96, 1.16
 XML_DIR = str(pathlib.Path(__file__).parent.resolve()) + '/assets/' # note: absolute path
 
 FPS = 50
+ 
 
 # Left finger position limits (qpos[7]), right_finger = -1 * left_finger
 MASTER_GRIPPER_POSITION_OPEN = 0.02417
