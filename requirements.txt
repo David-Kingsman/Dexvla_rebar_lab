@@ -164,6 +164,7 @@ referencing==0.34.0
 regex==2024.4.16
 requests==2.31.0
 requests-oauthlib==2.0.0
+# Editable install with no version control (robomimic==0.3.0)
 rospkg==1.5.1
 rpds-py==0.18.0
 rsa==4.9
@@ -194,9 +195,8 @@ tianshou==0.4.10
 timm==0.9.10
 tokenizers==0.20.1
 toolz==0.12.1
-# torch==2.4.1
-# # torchvision==0.15.2
-# torchvision==0.18.0
+torch==2.4.1
+torchvision
 tqdm==4.66.5
 traitlets==5.14.3
 transformers==4.45.2

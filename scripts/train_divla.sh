@@ -6,7 +6,7 @@ ACTION_HEAD=unet_diffusion_policy  #unet_diffusion_policy or scale_dp_policy
 
 MNOP=/path/to/pretrained/qwen2_vl # official qwen2_vl weights
 
-TASKNAME=rebar_insertion_tasks
+TASKNAME=rebar_insertion
 
 OUTPUT=/path/to/save/dir # Notice a standard OUTPUT dir should include key words "lora" and "qwen2_vl" for better load model(e.g. /root/path/lora_qwen2_vla_factory_sorting)
 

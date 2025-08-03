@@ -34,8 +34,6 @@ For training acceleration, please install [flash_attention](https://github.com/D
 pip install flash-attn --no-build-isolation 
 ```
 
-
-
 ## Data Preparation
 
 ### Example data and data structure
@@ -96,11 +94,9 @@ python data_utils/check_data_integrity.py
 We construct the VLM backbone by integrating Qwen2-VL-2B, a powerful and efficient model, into our framework. 
 The Qwen2-VL 2B serves as the core of our architecture, providing robust capabilities for vision-language tasks. We use off-the-shelf Qwen2-VL model proposed in [Qwen2-VL](https://arxiv.org/pdf/2409.12191) without any post training on VLM itself. You can download the official weights from this link:
 
-
 | Model               | Link                                                           |
 |---------------------|----------------------------------------------------------------|
 | Qwen2-VL (~2B)      | [huggingface](https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct) |
-
 
 **❗❗** After downloading the standard weights, you have to replace the official "config.json" with our "configs/config.json" designed for VLA.
 
@@ -123,17 +119,13 @@ We released our pretrained weights of ScaleDP-H which is trained after Stage1. N
 | ScaleDP-H (~1B)   | [huggingface](https://huggingface.co/lesjie/scale_dp_h)  |
 | ScaleDP-L (~400M) | [huggingface](https://huggingface.co/lesjie/scale_dp_l)  |
 
-
 ```bash
 git lfs install
-
 # ScaleDP-H (~1B)
 git clone https://huggingface.co/lesjie/scale_dp_h
-
 # ScaleDP-L (~400M)
 git clone https://huggingface.co/lesjie/scale_dp_l
 ```
-
 
 ## 🦾Train
 

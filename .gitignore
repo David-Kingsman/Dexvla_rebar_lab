@@ -174,3 +174,4 @@ cython_debug/
 # scripts recent edits
 models/
 flash-attention/
+check_hardware.py

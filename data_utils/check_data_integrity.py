@@ -17,13 +17,56 @@ def get_norm_stats(dataset_path_list, rank0_print=print):
     all_qpos_data = []
     all_action_data = []
     all_episode_len = []
+    
+    # 🔥 添加训练字段检查
+    missing_language_files = []
+    missing_reasoning_files = []
+    valid_language_files = 0
+    valid_reasoning_files = 0
 
     for dataset_path in tqdm(dataset_path_list):
         try:
             with h5py.File(dataset_path, 'r') as root:
+                # 检查现有的核心数据
                 qpos = root['/observations/qpos'][()]
                 qvel = root['/observations/qvel'][()]
                 action = root['/action'][()]
+
+                # 🔥 检查训练必需的语言字段
+                if 'language_raw' in root:
+                    try:
+                        raw_lang = root['language_raw'][0].decode('utf-8')
+                        valid_language_files += 1
+                        rank0_print(f'{os.path.basename(dataset_path)}: language_raw = "{raw_lang}"')
+                    except Exception as e:
+                        rank0_print(f'{os.path.basename(dataset_path)}: language_raw decode error: {e}')
+                        missing_language_files.append(dataset_path)
+                else:
+                    rank0_print(f'{os.path.basename(dataset_path)}: ❌ MISSING language_raw field')
+                    missing_language_files.append(dataset_path)
+
+                # 🔥 检查可选的推理字段
+                has_reasoning = False
+                if 'substep_reasonings' in root.keys():
+                    try:
+                        # 检查第一个有效时间步的推理
+                        reasoning = root['substep_reasonings'][0].decode('utf-8')
+                        rank0_print(f'{os.path.basename(dataset_path)}: substep_reasonings = "{reasoning[:50]}..."')
+                        has_reasoning = True
+                        valid_reasoning_files += 1
+                    except Exception as e:
+                        rank0_print(f'{os.path.basename(dataset_path)}: substep_reasonings decode error: {e}')
+                elif 'reasoning' in root.keys():
+                    try:
+                        reasoning = root['reasoning'][0].decode('utf-8')
+                        rank0_print(f'{os.path.basename(dataset_path)}: reasoning = "{reasoning[:50]}..."')
+                        has_reasoning = True
+                        valid_reasoning_files += 1
+                    except Exception as e:
+                        rank0_print(f'{os.path.basename(dataset_path)}: reasoning decode error: {e}')
+                
+                if not has_reasoning:
+                    missing_reasoning_files.append(dataset_path)
 
                 # 🔥 过滤掉NaN值 - 只保留有效数据
                 valid_mask = ~(np.isnan(qpos).any(axis=1) | np.isnan(action).any(axis=1))
@@ -78,7 +121,16 @@ def get_norm_stats(dataset_path_list, rank0_print=print):
              "example_qpos": all_qpos_data[0].numpy()
     }
 
-    return stats, all_episode_len
+    # 🔥 返回训练字段检查结果
+    training_check_results = {
+        'missing_language_files': missing_language_files,
+        'missing_reasoning_files': missing_reasoning_files,
+        'valid_language_files': valid_language_files,
+        'valid_reasoning_files': valid_reasoning_files,
+        'total_files': len(dataset_path_list)
+    }
+
+    return stats, all_episode_len, training_check_results
 
 
 if __name__ == "__main__":
@@ -107,7 +159,7 @@ if __name__ == "__main__":
     result = get_norm_stats(dataset_path_list)
     
     if result[0] is not None:
-        stats, episode_lengths = result
+        stats, episode_lengths, training_check = result
         
         print(f"\n=== DATASET SUMMARY ===")
         print(f"Episodes: {len(episode_lengths)}")
@@ -115,6 +167,20 @@ if __name__ == "__main__":
         print(f"Average episode length: {np.mean(episode_lengths):.1f}")
         print(f"Min episode length: {min(episode_lengths)}")
         print(f"Max episode length: {max(episode_lengths)}")
+
+        # 🔥 训练字段检查报告
+        print(f"\n=== TRAINING FIELDS CHECK ===")
+        print(f"Language field (language_raw):")
+        print(f"  ✅ Valid files: {training_check['valid_language_files']}/{training_check['total_files']}")
+        if training_check['missing_language_files']:
+            print(f"  ❌ Missing language_raw in {len(training_check['missing_language_files'])} files")
+            print(f"     Need to add language_raw field in process_data.py")
+        
+        print(f"Reasoning field (optional):")
+        print(f"  ✅ Valid files: {training_check['valid_reasoning_files']}/{training_check['total_files']}")
+        if training_check['missing_reasoning_files']:
+            print(f"  ⚠️  Missing reasoning in {len(training_check['missing_reasoning_files'])} files")
+            print(f"     Can set use_reasoning = False in training config")
         
         print(f"\n=== ACTION STATISTICS ===")
         for i in range(len(stats['action_mean'])):
@@ -131,6 +197,29 @@ if __name__ == "__main__":
         stats_file = os.path.join(path, "dataset_stats.npz")
         np.savez(stats_file, **stats, episode_lengths=episode_lengths)
         print(f"\nStatistics saved to: {stats_file}")
+
+        # 🔥 生成修复建议
+        print(f"\n=== RECOMMENDED ACTIONS ===")
+        
+        if training_check['missing_language_files']:
+            print(f"🔧 FIX REQUIRED - Missing language_raw field:")
+            print(f"   Add this to your process_data.py:")
+            print(f"   ```python")
+            print(f"   # Add language instruction")
+            print(f"   root.create_dataset('language_raw', (1,), dtype=h5py.string_dtype())")
+            print(f"   root['language_raw'][0] = 'insert the rebar into the hole'.encode('utf-8')")
+            print(f"   ```")
+        else:
+            print(f"✅ Language field: Ready for training!")
+            
+        if training_check['missing_reasoning_files']:
+            print(f"⚙️  OPTIONAL - Missing reasoning field:")
+            print(f"   Set in training config:")
+            print(f"   ```python")
+            print(f"   use_reasoning = False  # Disable reasoning functionality")
+            print(f"   ```")
+        else:
+            print(f"✅ Reasoning field: Available for enhanced training!")
         
         print("\n✅ Data integrity check completed successfully!")
     else:

@@ -11,7 +11,7 @@ DIT_PRETRAIN=/home/zekaijin/DexVLA/models/scale_dp_h/open_scale_dp_h_backbone.ck
 MNOP=/home/zekaijin/DexVLA/output/train_dexvla_stage2/checkpoint-10000
 
 # Task name
-TASKNAME=rebar_insertion_tasks
+TASKNAME=rebar_insertion
 
 # Output directory ("lora" must be included when training LoRA)
 OUTPUT=/home/zekaijin/DexVLA/output/train_dexvla_stage3  

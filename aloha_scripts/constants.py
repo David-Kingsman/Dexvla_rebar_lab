@@ -14,9 +14,9 @@ You have to add one entry in constants.py to specify the path of your data as fo
 DATA_DIR = "data" # '<put your data dir here>'
 
 TASK_CONFIGS = {
-    'rebar_insertion_tasks': { # for local debug
-        'dataset_dir': [DATA_DIR + "/rebar_insertion_demo"],# replace with your real data path
-        'episode_len': 2000,  
+    'rebar_insertion': { # for local debug
+        'dataset_dir': [DATA_DIR + "/rebar_insertion_hdf5"],# replace with your real data path
+        'episode_len': 300,   # length of each episode
         'camera_names': ["webcam_1","webcam_2"] # replacing with your real keys in h5py formatted data
     }
 }
