@@ -60,7 +60,7 @@ deepspeed --master_port 29604 --num_gpus=1 --num_nodes=1 ./train_vla.py \
   --bf16 True \
   --output_dir $OUTPUT \
   --max_steps 50000 \
-  --per_device_train_batch_size 2 \  
+  --per_device_train_batch_size 2 \
   --gradient_accumulation_steps 8 \
   --save_strategy "steps" \
   --save_steps 5000 \
