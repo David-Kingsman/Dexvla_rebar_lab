@@ -328,8 +328,8 @@ for episode_idx, folder in enumerate(subfolders):
             "observations/FT_processed": [FT_processed_data],
             # "action_hot": [action_hot_data],
             'observations/qpos':  [ee_gripper_data],
-            'observations/qvel': [np.zeros_like(ee_gripper_data)],  # 添加qvel，如果没有速度数据就用零填充
-            'is_edited': [np.array([False])]  # 添加编辑标志
+            'observations/qvel': [np.zeros_like(ee_gripper_data)],  # add qvel
+            'is_edited': [np.array([False])]  # add is_edited flag
         }
 
     for idx, cam_name in enumerate(camera_names):
@@ -407,10 +407,10 @@ for episode_idx, folder in enumerate(subfolders):
         target_hot = root.create_dataset('target', (1), fillvalue=np.nan)
         is_edited = root.create_dataset('is_edited', (1), fillvalue=False)  # 添加编辑标志数据集
         
-        # 添加语言指令数据集
+        # add language features
         root.create_dataset("language_raw", data=[lang_intrs])
-        # 如果有预处理的语言特征，也可以添加
-        dummy_bert_features = np.zeros((1, 768))  # 假设使用768维的BERT特征
+        # if we use BERT features, we can add dummy features here
+        dummy_bert_features = np.zeros((1, 768))  # assuming BERT features are 768-dimensional
         root.create_dataset("distill_bert_lang", data=dummy_bert_features)
 
         for name, array in data_dict.items():

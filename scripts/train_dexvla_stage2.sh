@@ -1,17 +1,16 @@
 #!/bin/bash
 LLM=qwen2_vl   #qwen2_vl  paligemma
 LLM_MODEL_SIZE=2B #3B
-
 ACTION_HEAD=scale_dp_policy  #unet_diffusion_policy or scale_dp_policy
 
-# path to the pre-trained ScaleDP weights
-# DIT_PRETRAIN=/path/to/pretrained/ScaleDP  # path to the pre-trained ScaleDP weights
-# MNOP=/path/to/pretrained/qwen2_vl # change to the official qwen2_vl weights
 
+# path to the pre-trained ScaleDP weights
 # use a large model (more parameters, more powerful)
-DIT_PRETRAIN=/home/zekaijin/DexVLA/models/scale_dp_l/open_scale_dp_l_backbone.ckpt
-# # use a small model (fewer parameters, less powerful)
+DIT_PRETRAIN=/home/zekaijin/DexVLA/models/scale_dp_h/open_scale_dp_h_backbone.ckpt
+# use a small model (fewer parameters, less powerful)
 # DIT_PRETRAIN=/home/zekaijin/DexVLA/models/scale_dp_l/open_scale_dp_l_backbone.ckpt
+
+# change to the official qwen2_vl weights
 MNOP=/home/zekaijin/DexVLA/models/Qwen2-VL-2B-Instruct
 
 # Task name
@@ -24,12 +23,12 @@ OUTPUT=/home/zekaijin/DexVLA/output/train_dexvla_stage2
 # Create output directory if it does not exist
 mkdir -p $OUTPUT
 
-echo "=== start single GPU training (without Flash Attention + ScaleDP_L) ==="
+echo "=== start single GPU training (without Flash Attention + ScaleDP_H) ==="
 echo "Configuration:"
 echo "- Number of GPUs: 1"
 echo "- Flash Attention: Disabled"
 echo "- Batch Size: 2"
-echo "- pretrained weights: ScaleDP_L"
+echo "- pretrained weights: ScaleDP_H"
 echo "- Output Directory: $OUTPUT"
 
 
@@ -60,20 +59,21 @@ deepspeed --master_port 29604 --num_gpus=1 --num_nodes=1 ./train_vla.py \
   --bf16 True \
   --output_dir $OUTPUT \
   --max_steps 50000 \
-  --per_device_train_batch_size 2 \
+  --per_device_train_batch_size 4 \
   --gradient_accumulation_steps 8 \
   --save_strategy "steps" \
-  --save_steps 5000 \
+  --save_steps 2500 \
   --save_total_limit 10 \
   --learning_rate 2e-5 \
-  --weight_decay 0. \
-  --warmup_ratio 0.01 \
+  --weight_decay 0.01 \
+  --warmup_ratio 0.03 \
   --lr_scheduler_type "constant" \
-  --logging_steps 50 \
+  --logging_steps 25 \
   --tf32 True \
   --model_max_length 1024 \
   --gradient_checkpointing True \
-  --dataloader_num_workers 4 \
+  --dataloader_num_workers 8 \
+  --dataloader_pin_memory True \
   --lazy_preprocess True \
   --policy_class $ACTION_HEAD \
   --concat "token_cat" \

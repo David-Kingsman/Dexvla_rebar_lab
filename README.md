@@ -21,13 +21,12 @@ Install Packages
 conda create -n dexvla python=3.10 -y
 conda activate dexvla
 pip install --upgrade pip  
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 pip install -r requirements.txt
 cd policy_heads
 pip install -e .
 ```
-
 For training acceleration, please install [flash_attention](https://github.com/Dao-AILab/flash-attention).
 
 ```shell
@@ -80,6 +79,9 @@ python data_preprocess_scripts/process_data.py
 # To visualize HDF5's state-action pair and visual observations 
 python visualize_episodes_dexvla.py --dataset_dir data/rebar_insertion_hdf5/ --episode_idx 0 --video 
 ```
+If success, you will find the data in DexVLA/data/rebar_insertion_hdf5
+ folder.
+
 
 ### Data Utils
 

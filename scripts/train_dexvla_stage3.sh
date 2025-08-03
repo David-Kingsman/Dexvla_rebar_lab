@@ -5,9 +5,9 @@ LLM_MODEL_SIZE=2B
 ACTION_HEAD=scale_dp_policy  #unet_diffusion_policy or scale_dp_policy
 
 # path to the pre-trained ScaleDP weights
-# DIT_PRETRAIN=/path/to/pretrained/ScaleDP  
-# MNOP=/path/to/trained/DexVLA # DexVLA weights after stage 2
 DIT_PRETRAIN=/home/zekaijin/DexVLA/models/scale_dp_h/open_scale_dp_h_backbone.ckpt
+
+# DexVLA weights after stage 2
 MNOP=/home/zekaijin/DexVLA/output/train_dexvla_stage2/checkpoint-10000
 
 # Task name
