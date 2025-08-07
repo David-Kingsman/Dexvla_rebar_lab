@@ -1,0 +1,12 @@
+# Data Collection Configuration
+dataset_name: "demos_collected_ur"
+obs_cfg: "configs/real_robot_observation_cfg.yml"
+robot: "UR30"
+ip: "10.140.3.224"
+controller_type: "cartesian_servo_position"
+max_steps: 15000
+control_frequency: 50
+save2memory_first: true
+FT_option: true
+cam_necessary: true
+demo_save_frequency: 10

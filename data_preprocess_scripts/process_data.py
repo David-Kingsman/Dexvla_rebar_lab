@@ -166,6 +166,16 @@ def abs2delta(ee_gripper_data, type="6D"):
         raise NotImplementedError
     return relative_pose
 
+def get_valid_length(arr):
+    """returns the index of the first timestep that is all NaN (i.e., valid length)"""
+    if arr.ndim == 1:
+        mask = ~np.isnan(arr)
+        return np.sum(mask)
+    else:
+        mask = ~np.isnan(arr).any(axis=tuple(range(1, arr.ndim)))
+        return np.argmax(~mask) if np.any(~mask) else arr.shape[0]
+
+
 # Loop through each subfolder and process data 
 for episode_idx, folder in enumerate(subfolders):
     print(f"Processing {folder}...")
@@ -346,7 +356,31 @@ for episode_idx, folder in enumerate(subfolders):
             if "rs" in cam_name:
                 data_dict[f'/observations/images/{cam_name}_depth'] = []
                 data_dict[f'/observations/images/{cam_name}_depth'].append(all_image_data[f"{cam_name}_depth"])
-    # import pdb;pdb.set_trace()
+
+        arrays_to_trim = [
+            action_data,
+            ee_gripper_data,
+            FT_raw_data,
+            FT_processed_data,
+        ]
+        for cam_name in camera_names:
+            arrays_to_trim.append(all_image_data[f"{cam_name}_rgb"])
+
+        valid_lens = [get_valid_length(arr) for arr in arrays_to_trim]
+        valid_len = min(valid_lens)
+        if valid_len == 0:
+            print(f"{folder} no valid data, skipping...")
+            continue
+
+        # trim the arrays to the valid length
+        action_data = action_data[:valid_len]
+        ee_gripper_data = ee_gripper_data[:valid_len]
+        FT_raw_data = FT_raw_data[:valid_len]
+        FT_processed_data = FT_processed_data[:valid_len]
+        for cam_name in camera_names:
+            all_image_data[f"{cam_name}_rgb"] = all_image_data[f"{cam_name}_rgb"][:valid_len]
+
+
     assert action_data.shape[0] == ee_gripper_data.shape[0] == list(all_image_data.values())[0].shape[0], "Shape is incorrect"
     for idx in range(len(list(all_image_data.values()))):
         assert list(all_image_data.values())[0].shape[0] == list(all_image_data.values())[idx].shape[0], "Image numbers should be same"
@@ -362,21 +396,21 @@ for episode_idx, folder in enumerate(subfolders):
             if sam2_option:
                 _ = image.create_dataset(
                     f'{cam_name}_crop1',
-                    (max_timesteps, image_h, image_w, 3),  # Shape: (timesteps, height, width, channels)
+                    (valid_len, image_h, image_w, 3),  # Shape: (timesteps, height, width, channels)
                     dtype='uint8',  # Image data type (uint8 for images)
                     chunks=(1, image_h, image_w, 3),  # Chunk size for better performance
                     fillvalue=np.nan
                 )
                 _ = image.create_dataset(
                     f'{cam_name}_crop2',
-                    (max_timesteps, image_h, image_w, 3),  # Shape: (timesteps, height, width, channels)
+                    (valid_len, image_h, image_w, 3),  # Shape: (timesteps, height, width, channels)
                     dtype='uint8',  # Image data type (uint8 for images)
                     chunks=(1, image_h, image_w, 3),  # Chunk size for better performance
                     fillvalue=np.nan
                 )
                 _ = image.create_dataset(
                     f'{cam_name}_crop3',
-                    (max_timesteps, image_h, image_w, 3),  # Shape: (timesteps, height, width, channels)
+                    (valid_len, image_h, image_w, 3),  # Shape: (timesteps, height, width, channels)
                     dtype='uint8',  # Image data type (uint8 for images)
                     chunks=(1, image_h, image_w, 3),  # Chunk size for better performance
                     fillvalue=np.nan
@@ -384,7 +418,7 @@ for episode_idx, folder in enumerate(subfolders):
             else:
                 _ = image.create_dataset(
                     cam_name,
-                    (max_timesteps, image_h, image_w, 3),  # Shape: (timesteps, height, width, channels)
+                    (valid_len, image_h, image_w, 3),  # Shape: (timesteps, height, width, channels)
                     dtype='uint8',  # Image data type (uint8 for images)
                     chunks=(1, image_h, image_w, 3),  # Chunk size for better performance
                     fillvalue = np.nan
@@ -392,20 +426,21 @@ for episode_idx, folder in enumerate(subfolders):
             if "rs" in cam_name:
                 _ = image.create_dataset(
                     f"{cam_name}_depth",
-                    (max_timesteps, image_h, image_w),  # Shape: (timesteps, height, width, channels)
+                    (valid_len, image_h, image_w),  # Shape: (timesteps, height, width, channels)
                     dtype='uint16',  # Image data type (uint8 for images)
                     chunks=(1, image_h, image_w),  # Chunk size for better performance
                     fillvalue = np.nan
                 )
-
-        qpos = obs.create_dataset('qpos', (max_timesteps, 7), fillvalue=np.nan) # 7-dimentional ee pose and gripper state
-        qvel = obs.create_dataset('qvel', (max_timesteps, 7), fillvalue=np.nan)
-        FT_raw = obs.create_dataset('FT_raw', (max_timesteps, 6), fillvalue=np.nan)
-        FT_processed = obs.create_dataset('FT_processed', (max_timesteps, 6), fillvalue=np.nan)
-        action = root.create_dataset('action', (max_timesteps, 7), fillvalue=np.nan)
-        action_hot = root.create_dataset('action_hot', (max_timesteps, 1), fillvalue=np.nan)
+        
+        # Fill the image datasets with data
+        qpos = obs.create_dataset('qpos', (valid_len, 7), fillvalue=np.nan) # 7-dimentional ee pose and gripper state
+        qvel = obs.create_dataset('qvel', (valid_len, 7), fillvalue=np.nan)
+        FT_raw = obs.create_dataset('FT_raw', (valid_len, 6), fillvalue=np.nan)
+        FT_processed = obs.create_dataset('FT_processed', (valid_len, 6), fillvalue=np.nan)
+        action = root.create_dataset('action', (valid_len, 7), fillvalue=np.nan)
+        action_hot = root.create_dataset('action_hot', (valid_len, 1), fillvalue=np.nan)
         target_hot = root.create_dataset('target', (1), fillvalue=np.nan)
-        is_edited = root.create_dataset('is_edited', (1), fillvalue=False)  # 添加编辑标志数据集
+        is_edited = root.create_dataset('is_edited', (1), fillvalue=False)  # add is_edited flag
         
         # add language features
         root.create_dataset("language_raw", data=[lang_intrs])

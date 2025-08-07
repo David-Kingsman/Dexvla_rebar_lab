@@ -289,7 +289,7 @@ class PatchEmbed(nn.Module):
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         target_dtype = self.proj.weight.dtype
-        hidden_states = hidden_states.view(
+        hidden_states = hidden_states.reshape(
             -1, self.in_channels, self.temporal_patch_size, self.patch_size, self.patch_size
         )
         hidden_states = self.proj(hidden_states.to(dtype=target_dtype)).view(-1, self.embed_dim)
@@ -923,8 +923,9 @@ class Qwen2VLDecoderLayer(nn.Module):
         """
 
         residual = hidden_states
-
+        # print("block input:", hidden_states.mean(), torch.isnan(hidden_states).any())
         hidden_states = self.input_layernorm(hidden_states)
+        # print("after input_layernorm:", hidden_states.mean(), torch.isnan(hidden_states).any())
 
         # Self Attention
         hidden_states, self_attn_weights, present_key_value = self.self_attn(
@@ -1154,7 +1155,10 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         )
 
         hidden_states = inputs_embeds
-
+        # print("Qwen2VLModel inputs_embeds nan:", torch.isnan(hidden_states).any(), hidden_states.shape)
+        # print("inputs_embeds:", hidden_states.mean(), torch.isnan(hidden_states).any(), hidden_states.shape)
+        for i, decoder_layer in enumerate(self.layers):
+            print(f"before block {i}: {hidden_states.mean()}, nan: {torch.isnan(hidden_states).any()}")
         # create position embeddings to be shared across the decoder layers
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
 
@@ -1192,6 +1196,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                 )
 
             hidden_states = layer_outputs[0]
+            # print(f"after block {i}: {hidden_states.mean()}, nan: {torch.isnan(hidden_states).any()}")
 
             if use_cache:
                 next_decoder_cache = layer_outputs[2 if output_attentions else 1]
@@ -1200,7 +1205,10 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                 all_self_attns += (layer_outputs[1],)
 
         hidden_states = self.norm(hidden_states)
-
+        # for n, p in self.norm.named_parameters():
+        #     print(f"norm param {n} nan:", torch.isnan(p).any())
+        # print("final transformer output:", hidden_states.mean(), torch.isnan(hidden_states).any(), hidden_states.shape)
+        
         # add hidden states from the last decoder layer
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
@@ -1739,9 +1747,12 @@ class Qwen2VLForConditionalGenerationForVLA(Qwen2VLPreTrainedModel, GenerationMi
 
         if inputs_embeds is None:
             inputs_embeds = self.model.embed_tokens(input_ids)
+            # print("input_ids nan:", torch.isnan(input_ids).any() if input_ids is not None else None)
+            # print("attention_mask nan:", torch.isnan(attention_mask).any() if attention_mask is not None else None)
             if pixel_values is not None:
                 pixel_values = pixel_values.type(self.visual.get_dtype())
                 image_embeds = self.visual(pixel_values, grid_thw=image_grid_thw)
+                # print("image_embeds:", image_embeds.mean(), torch.isnan(image_embeds).any(), image_embeds.shape)
                 n_image_tokens = (input_ids == self.config.image_token_id).sum().item()
                 n_image_features = image_embeds.shape[0]
                 if n_image_tokens != n_image_features:
@@ -1756,8 +1767,11 @@ class Qwen2VLForConditionalGenerationForVLA(Qwen2VLPreTrainedModel, GenerationMi
                 )
                 image_embeds = image_embeds.to(inputs_embeds.device, inputs_embeds.dtype)
                 inputs_embeds = inputs_embeds.masked_scatter(image_mask, image_embeds)
+                # print("pixel_values nan:", torch.isnan(pixel_values).any())
+                # print("inputs_embeds after scatter:", torch.isnan(inputs_embeds).any(), inputs_embeds.shape)
 
             if pixel_values_videos is not None:
+                # print("pixel_values_videos nan:", torch.isnan(pixel_values_videos).any())
                 pixel_values_videos = pixel_values_videos.type(self.visual.get_dtype())
                 video_embeds = self.visual(pixel_values_videos, grid_thw=video_grid_thw)
                 n_video_tokens = (input_ids == self.config.video_token_id).sum().item()
@@ -1774,6 +1788,7 @@ class Qwen2VLForConditionalGenerationForVLA(Qwen2VLPreTrainedModel, GenerationMi
                 )
                 video_embeds = video_embeds.to(inputs_embeds.device, inputs_embeds.dtype)
                 inputs_embeds = inputs_embeds.masked_scatter(video_mask, video_embeds)
+                # print("inputs_embeds after scatter:", torch.isnan(inputs_embeds).any(), inputs_embeds.shape)
 
             if attention_mask is not None:
                 attention_mask = attention_mask.to(inputs_embeds.device)
@@ -1791,6 +1806,8 @@ class Qwen2VLForConditionalGenerationForVLA(Qwen2VLPreTrainedModel, GenerationMi
         )
 
         hidden_states = outputs[0]
+        print("transformer output shape:", hidden_states.shape)
+
         if tinyvla: # dex-vla supports tinyvla-style VLA
             return hidden_states
 
@@ -1834,7 +1851,21 @@ class Qwen2VLForConditionalGenerationForVLA(Qwen2VLPreTrainedModel, GenerationMi
         else: 
             action_hidden_states = hidden_states
 
+        self.action_proj = torch.nn.Linear(self.config.hidden_size, self.config.policy_head_config.n_emb).to('cuda')
+
+        # Project the hidden states to the action space
+        if self.using_film:
+            action_hidden_states = self.film_forward(labels=labels, input_ids=input_ids, hidden_states=hidden_states)
+        else:
+            action_hidden_states = hidden_states
+        print("transformer output nan:", torch.isnan(hidden_states).any(), "shape:", hidden_states.shape)
+
+        print("before projection nan:", torch.isnan(action_hidden_states).any(), "shape:", action_hidden_states.shape)
+        action_hidden_states = self.action_proj(action_hidden_states)
+        print("after projection nan:", torch.isnan(action_hidden_states).any(), "shape:", action_hidden_states.shape)
+
         ret = self.policy_head(actions=actions, hidden_states=action_hidden_states, states=states, is_pad=is_pad)
+        print("policy_head input shape:", action_hidden_states.shape)
 
         loss = {'loss': ret['loss'] + self.llm_loss_weight * llm_loss,
                 'llm_loss': llm_loss,
@@ -2032,8 +2063,13 @@ class Qwen2VLForConditionalGenerationForVLA(Qwen2VLPreTrainedModel, GenerationMi
                                                      input_ids=output_ids,
                                                      hidden_states=torch.cat(last_hidden_states, dim=1))
 
-
+        print("evaluate: action_hidden_states", action_hidden_states.shape if action_hidden_states is not None else None, 
+            torch.isnan(action_hidden_states).any() if action_hidden_states is not None else None)
+        print("evaluate: states", states.shape, torch.isnan(states).any())
+        print("evaluate: actions", actions.shape if actions is not None else None, 
+            torch.isnan(actions).any() if actions is not None else None)
         action = self.policy_head(actions, action_hidden_states, states.to(all_hidden_states.dtype), is_pad)
+        print("evaluate: action_hidden_states", action_hidden_states.shape, torch.isnan(action_hidden_states).any())
         return action, outputs_text
 
     def evaluate_tinyvla(self,

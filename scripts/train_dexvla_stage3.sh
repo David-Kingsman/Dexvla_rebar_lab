@@ -8,20 +8,20 @@ ACTION_HEAD=scale_dp_policy  #unet_diffusion_policy or scale_dp_policy
 DIT_PRETRAIN=/home/zekaijin/DexVLA/models/scale_dp_h/open_scale_dp_h_backbone.ckpt
 
 # DexVLA weights after stage 2
-MNOP=/home/zekaijin/DexVLA/output/train_dexvla_stage2/checkpoint-10000
+MNOP=/home/zekaijin/DexVLA/output/train_dexvla_stage2/checkpoint-2000
 
 # Task name
 TASKNAME=rebar_insertion
 
 # Output directory ("lora" must be included when training LoRA)
-OUTPUT=/home/zekaijin/DexVLA/output/train_dexvla_stage3  
+OUTPUT=/home/zekaijin/DexVLA/output/qwen2_lora_rebar_insertion_stage3
 
 deepspeed --master_port 29604 --num_gpus=8 --num_nodes=1 ./train_vla.py \
   --deepspeed scripts/zero2.json \
   --use_reasoning True \
-  --lora_enable False \
-  --action_dim 14 \
-  --state_dim 14 \
+  --lora_enable True \
+  --action_dim 7 \
+  --state_dim 7 \
   --flash_attn True \
   --chunk_size 50 \
   --lora_module "vit llm" \

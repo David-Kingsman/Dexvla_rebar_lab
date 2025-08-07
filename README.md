@@ -90,7 +90,6 @@ This step checks the integrity of the processed data before training
 python data_utils/check_data_integrity.py
 ```
 
-
 ## 🤗Download Pretrained Weights
 ### Download official Qwen2_VL weights
 We construct the VLM backbone by integrating Qwen2-VL-2B, a powerful and efficient model, into our framework. 

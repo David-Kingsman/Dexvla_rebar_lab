@@ -165,8 +165,18 @@ class ScaleDPBlock(nn.Module):
 
     def forward(self, x, c, attn_mask=None):
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(c).chunk(6, dim=1)
-        x = x + gate_msa.unsqueeze(1) * self.attn(modulate(self.norm1(x), shift_msa, scale_msa), attn_mask=attn_mask) # norm, scale&shift, attn, scale,
-        x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
+        # print("block adaLN_modulation:", shift_msa.mean(), scale_msa.mean(), gate_msa.mean())
+        x1 = modulate(self.norm1(x), shift_msa, scale_msa)
+        # print("block norm1+modulate:", x1.mean(), torch.isnan(x1).any())
+        attn_out = self.attn(x1, attn_mask=attn_mask)
+        # print("block attn_out:", attn_out.mean(), torch.isnan(attn_out).any())
+        x = x + gate_msa.unsqueeze(1) * attn_out
+        x2 = modulate(self.norm2(x), shift_mlp, scale_mlp)
+        # print("block norm2+modulate:", x2.mean(), torch.isnan(x2).any())
+        mlp_out = self.mlp(x2)
+        # print("block mlp_out:", mlp_out.mean(), torch.isnan(mlp_out).any())
+        x = x + gate_mlp.unsqueeze(1) * mlp_out
+        # print("block x after mlp:", x.mean(), torch.isnan(x).any())
         return x
 
 
@@ -456,8 +466,11 @@ class ScaleDP(PreTrainedModel):
             global_cond = self.norm_after_pool(global_cond)
         else:
             global_cond = global_cond.squeeze(1)
+        # print("global_cond after squeeze/avgpool:", global_cond.mean(), torch.isnan(global_cond).any())
         global_cond = torch.cat([global_cond, states], dim=-1) if states is not None else global_cond
+        # print("global_cond after cat states:", global_cond.mean(), torch.isnan(global_cond).any())
         global_cond = self.combine(global_cond)
+        # print("global_cond after combine:", global_cond.mean(), torch.isnan(global_cond).any())
 
         if not torch.is_tensor(t):
             t = torch.tensor([t], dtype=torch.long, device=x.device)
@@ -466,15 +479,20 @@ class ScaleDP(PreTrainedModel):
         t = t.expand(t.shape[0])
 
         x = self.x_embedder(x) + self.pos_embed.to(device=x.device, dtype=x.dtype)  # (N, T, D), where T = prediction_horizon
+        # print("x after x_embedder+pos_embed:", x.mean(), torch.isnan(x).any())
         t = self.t_embedder(t)  # (N, D)
+        # print("t after t_embedder:", t.mean(), torch.isnan(t).any())
         if self.obs_as_cond:
             global_cond = self.cond_obs_emb(global_cond)  # (N, D)
         # c = t + global_cond.sum(dim=1)  # (N, D)
         c = t + global_cond  # (N, D)
-        for block in self.blocks:
+        # print("c after t+global_cond:", c.mean(), torch.isnan(c).any())
+        for i, block in enumerate(self.blocks):
             # x = block(x, c, attn_mask=self.mask)  # (N, T, D)
             x = block(x, c, attn_mask=None)  # (N, T, D)
+            # print(f"x after block {i}:", x.mean(), torch.isnan(x).any())
         x = self.final_layer(x, c)  # (N, T, output_dim)
+        # print("x after final_layer:", x.mean(), torch.isnan(x).any())
         return x
 
 #################################################################################

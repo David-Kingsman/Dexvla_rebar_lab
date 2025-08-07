@@ -48,7 +48,7 @@ def load_model(config=None, qwen2_vla_config=None, rank0_print=print, tokenizer=
         pass
         kwargs = {"device_map": "cuda", "torch_dtype": torch.bfloat16}
         rank0_print(f"@@@@@@@Loading pretrain weights...@@@@@@@@@@")
-        assert config['model_args'].model_pretrain is not "", "load pretrain weights need set the model_pretrain in DataArguments!!!!"
+        assert config['model_args'].model_pretrain != "", "load pretrain weights need set the model_pretrain in DataArguments!!!!"
         # models = load_pretrained_model(config['model_args'].model_pretrain, config['model_args'].model_name_or_path, model_name, False, False)
         model_path = config['model_args'].model_pretrain
         model_base = config['model_args'].model_name_or_path
@@ -82,8 +82,14 @@ def load_model(config=None, qwen2_vla_config=None, rank0_print=print, tokenizer=
             non_lora_trainables = torch.load(os.path.join(model_path, 'non_lora_trainables.bin'), map_location='cpu')
         else:
             raise f"there is no non_lora_trainables.bin in {model_path}"
+        
+        def strip_prefix(k):
+            for prefix in ['base_model.model.', 'base_model.', 'model.']:
+                if k.startswith(prefix):
+                    k = k[len(prefix):]
+            return k
 
-        non_lora_trainables = {(k[11:] if k.startswith('base_model.') else k): v for k, v in
+        non_lora_trainables = {(strip_prefix(k)): v for k, v in
                                non_lora_trainables.items()}
         if any(k.startswith('model.policy_head.') for k in non_lora_trainables):
             non_lora_trainables = {(k[6:] if k.startswith('model.') else k): v for k, v in
@@ -351,18 +357,29 @@ def load_merge_lora_weights(model_path=None, model_base=None, kwargs=None):
         # this is probably from HF Hub
         from huggingface_hub import hf_hub_download
         def load_from_hf(repo_id, filename, subfolder=None):
-            cache_file = hf_hub_download(
-                repo_id=repo_id,
-                filename=filename,
-                subfolder=subfolder)
-            return torch.load(cache_file, map_location='cpu')
+            if os.path.isdir(model_path):
+                # local path
+                cache_file = os.path.join(model_path, filename)
+                if not os.path.exists(cache_file):
+                    raise FileNotFoundError(f"{cache_file} not found!")
+                return cache_file
+            else:
+                # HuggingFace Hub path
+                from huggingface_hub import hf_hub_download
+                return hf_hub_download(repo_id=model_path, filename=filename)
 
         non_lora_trainables = load_from_hf(model_path, 'non_lora_trainables.bin')
-    non_lora_trainables = {(k[11:] if k.startswith('base_model.') else k): v for k, v in
-                           non_lora_trainables.items()}
-    if any(k.startswith('model.policy_head.') for k in non_lora_trainables):
-        non_lora_trainables = {(k[6:] if k.startswith('model.') else k): v for k, v in
-                               non_lora_trainables.items()}
+    
+    def strip_prefix(k):
+        for prefix in ['base_model.model.', 'base_model.', 'model.']:
+            if k.startswith(prefix):
+                k = k[len(prefix):]
+        return k
+
+    non_lora_trainables = {(strip_prefix(k)): v for k, v in non_lora_trainables.items()}
+    # if any(k.startswith('model.policy_head.') for k in non_lora_trainables):
+    #     non_lora_trainables = {(k[6:] if k.startswith('model.') else k): v for k, v in
+    #                            non_lora_trainables.items()}
 
     # Delete the parameters related to Lora
     keys_to_del = []
@@ -372,6 +389,9 @@ def load_merge_lora_weights(model_path=None, model_base=None, kwargs=None):
     for key in keys_to_del:
         del non_lora_trainables[key]
 
+    print("Model param shape:", model.policy_head.blocks[0].mlp.fc1.weight.shape)
+    print("Loaded weight shape:", non_lora_trainables.get('policy_head.blocks.0.mlp.fc1.weight', None).shape)
+    print("Loaded weight sample:", non_lora_trainables['policy_head.blocks.0.mlp.fc1.weight'].flatten()[:10])
     model.load_state_dict(non_lora_trainables, strict=False)
 
     from peft import PeftModel

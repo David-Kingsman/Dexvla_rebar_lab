@@ -1,0 +1,57 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VSCode settings
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+*.env
+
+# Compiled C/C++/so files
+*.so
+*.o
+*.out
+*.a
+
+# Build and dist folders
+build/
+dist/
+*.egg-info/
+
+# Data and logs
+demos_collected/
+data/
+logs/
+*.log
+demos_backup/
+
+# Zarr and NPZ datasets
+*.zarr/
+*.npz
+
+# Camera images
+images/
+*.jpg
+*.png
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# Ignore personal notes
+*.md~
+notes.txt
+
+# Ignore test outputs
+test_output/

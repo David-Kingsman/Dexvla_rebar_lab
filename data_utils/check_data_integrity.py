@@ -17,8 +17,8 @@ def get_norm_stats(dataset_path_list, rank0_print=print):
     all_qpos_data = []
     all_action_data = []
     all_episode_len = []
-    
-    # 🔥 添加训练字段检查
+
+    # 🔥 Check the training field
     missing_language_files = []
     missing_reasoning_files = []
     valid_language_files = 0
@@ -27,12 +27,12 @@ def get_norm_stats(dataset_path_list, rank0_print=print):
     for dataset_path in tqdm(dataset_path_list):
         try:
             with h5py.File(dataset_path, 'r') as root:
-                # 检查现有的核心数据
+                # Check existing core data
                 qpos = root['/observations/qpos'][()]
                 qvel = root['/observations/qvel'][()]
                 action = root['/action'][()]
 
-                # 🔥 检查训练必需的语言字段
+                # 🔥 Check the Languages field required for training
                 if 'language_raw' in root:
                     try:
                         raw_lang = root['language_raw'][0].decode('utf-8')
@@ -45,11 +45,11 @@ def get_norm_stats(dataset_path_list, rank0_print=print):
                     rank0_print(f'{os.path.basename(dataset_path)}: ❌ MISSING language_raw field')
                     missing_language_files.append(dataset_path)
 
-                # 🔥 检查可选的推理字段
+                # 🔥 Check optional reasoning fields
                 has_reasoning = False
                 if 'substep_reasonings' in root.keys():
                     try:
-                        # 检查第一个有效时间步的推理
+                        # Check inference for the first valid time step
                         reasoning = root['substep_reasonings'][0].decode('utf-8')
                         rank0_print(f'{os.path.basename(dataset_path)}: substep_reasonings = "{reasoning[:50]}..."')
                         has_reasoning = True
@@ -68,14 +68,14 @@ def get_norm_stats(dataset_path_list, rank0_print=print):
                 if not has_reasoning:
                     missing_reasoning_files.append(dataset_path)
 
-                # 🔥 过滤掉NaN值 - 只保留有效数据
+                # 🔥 Filter out NaN values - only keep valid data
                 valid_mask = ~(np.isnan(qpos).any(axis=1) | np.isnan(action).any(axis=1))
                 
                 if valid_mask.sum() == 0:
                     rank0_print(f'Warning: No valid data in {dataset_path}')
                     continue
                 
-                # 只保留有效的数据点
+                # Only keep valid data points
                 qpos_valid = qpos[valid_mask]
                 action_valid = action[valid_mask]
                 
@@ -88,7 +88,7 @@ def get_norm_stats(dataset_path_list, rank0_print=print):
 
         all_qpos_data.append(torch.from_numpy(qpos_valid))
         all_action_data.append(torch.from_numpy(action_valid))
-        all_episode_len.append(len(qpos_valid))  # 记录实际的episode长度
+        all_episode_len.append(len(qpos_valid))  # Record the actual episode length
     
     if not all_qpos_data:
         rank0_print("No valid data found!")
@@ -121,7 +121,7 @@ def get_norm_stats(dataset_path_list, rank0_print=print):
              "example_qpos": all_qpos_data[0].numpy()
     }
 
-    # 🔥 返回训练字段检查结果
+    # 🔥 Returns the training field check results
     training_check_results = {
         'missing_language_files': missing_language_files,
         'missing_reasoning_files': missing_reasoning_files,
@@ -163,12 +163,12 @@ if __name__ == "__main__":
         
         print(f"\n=== DATASET SUMMARY ===")
         print(f"Episodes: {len(episode_lengths)}")
-        print(f"Total valid timesteps: {sum(episode_lengths)}")  # 🔥 显示有效时间步
+        print(f"Total valid timesteps: {sum(episode_lengths)}")  # 
         print(f"Average episode length: {np.mean(episode_lengths):.1f}")
         print(f"Min episode length: {min(episode_lengths)}")
         print(f"Max episode length: {max(episode_lengths)}")
 
-        # 🔥 训练字段检查报告
+        # 🔥 Training Field Inspection Report
         print(f"\n=== TRAINING FIELDS CHECK ===")
         print(f"Language field (language_raw):")
         print(f"  ✅ Valid files: {training_check['valid_language_files']}/{training_check['total_files']}")
@@ -198,7 +198,7 @@ if __name__ == "__main__":
         np.savez(stats_file, **stats, episode_lengths=episode_lengths)
         print(f"\nStatistics saved to: {stats_file}")
 
-        # 🔥 生成修复建议
+        # 🔥 recommendations based on training check
         print(f"\n=== RECOMMENDED ACTIONS ===")
         
         if training_check['missing_language_files']:

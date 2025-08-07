@@ -175,3 +175,5 @@ cython_debug/
 models/
 flash-attention/
 check_hardware.py
+check/
+bitsandbytes/
