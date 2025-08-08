@@ -19,10 +19,10 @@ class ScaleDPPolicyConfig(PretrainedConfig):
     def __init__(
             self,
             eval: bool = False,
-            action_dim: int = 14,  # action dim
+            action_dim: int = 7,  # action dim
             # output_dim: int = 14,  # action dim
             cond_dim: int = 1536,  # the input dim of the condition
-            state_dim: int = 14,  # the input dim of the state
+            state_dim: int = 7,  # the input dim of the state
             prediction_horizon: int = 16,  # horizon
             n_obs_steps: int = 2,  # number of observation steps
             depth: int = 28,  # number of DiT blocks

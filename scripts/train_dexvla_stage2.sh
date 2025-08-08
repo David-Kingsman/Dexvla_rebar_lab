@@ -17,7 +17,12 @@ OUTPUT=/home/zekaijin/DexVLA/output/qwen2_rebar_insertion_stage2
 
 # Create output directory if it does not exist
 mkdir -p $OUTPUT
+import redis
+import numpy as np
+import cv2
+import torch
 
+def get_redis_image(redis_client, key, timeout
 echo "=== start 4-GPU training  ==="
 echo "Configuration:"
 echo "- Number of GPUs: 4"

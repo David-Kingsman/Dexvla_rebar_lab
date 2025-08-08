@@ -111,7 +111,8 @@ def load_model(config=None, qwen2_vla_config=None, rank0_print=print, tokenizer=
         rank0_print('Merging LoRA weights...')
         model = model.merge_and_unload()
         rank0_print('Model is loaded...')
-        model.to(torch.bfloat16)
+        # model.to(torch.bfloat16)
+        model = model.to(torch.float32)
     
     else:
         kwargs = {"device_map": "cuda", "torch_dtype": torch.bfloat16}
@@ -400,6 +401,7 @@ def load_merge_lora_weights(model_path=None, model_base=None, kwargs=None):
     print('Merging LoRA weights...')
     model = model.merge_and_unload()
     print('Model is loaded...')
+    model = model.to(torch.bfloat16)
     return model, tokenizer
 
 def load_model_for_eval(model_path, model_base, load_8bit=False, load_4bit=False, device_map="cuda", policy_config=None):
@@ -415,8 +417,9 @@ def load_model_for_eval(model_path, model_base, load_8bit=False, load_4bit=False
             bnb_4bit_quant_type='nf4'
         )
     else:
+        # kwargs['torch_dtype'] = torch.bfloat16
         kwargs['torch_dtype'] = torch.bfloat16
-    
+        
     if 'qwen2' in model_path.lower():
 
         if 'lora' in model_path.lower() and model_base is None: # only for lora finetuning
@@ -487,6 +490,7 @@ def load_model_for_eval(model_path, model_base, load_8bit=False, load_4bit=False
     else:
         context_len = 2048
     model.to(device="cuda")
+    model = model.to(torch.bfloat16) 
     print(kwargs)
     # print(model)
     return tokenizer, model, multi_modal_processor, context_len
