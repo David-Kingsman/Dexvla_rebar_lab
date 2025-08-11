@@ -1005,6 +1005,21 @@ class Qwen2VisionTransformerPretrainedModel(Qwen2VLPreTrainedModel):
     config_class = Qwen2VLAVisionConfig
     _no_split_modules = ["Qwen2VLVisionBlock"]
 
+    #new added
+    def forward(self, hidden_states: torch.Tensor, grid_thw: torch.Tensor) -> torch.Tensor:
+        hidden_states = self.patch_embed(hidden_states)
+        rotary_pos_emb = self.rot_pos_emb(grid_thw)
+
+        cu_seqlens = torch.repeat_interleave(grid_thw[:, 1] * grid_thw[:, 2], grid_thw[:, 0]).cumsum(
+            dim=0, dtype=torch.int32
+        )
+        cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
+
+        for blk in self.blocks:
+            hidden_states = blk(hidden_states, cu_seqlens=cu_seqlens, rotary_pos_emb=rotary_pos_emb)
+
+        return self.merger(hidden_states)
+
     def __init__(self, config) -> None:
         super().__init__(config)
         self.spatial_merge_size = config.spatial_merge_size
@@ -1070,11 +1085,13 @@ class Qwen2VisionTransformerPretrainedModel(Qwen2VLPreTrainedModel):
         )
         cu_seqlens = F.pad(cu_seqlens, (1, 0), value=0)
 
-        for blk in self.blocks:
+        for i, blk in enumerate(self.blocks):
             hidden_states = blk(hidden_states, cu_seqlens=cu_seqlens, rotary_pos_emb=rotary_pos_emb)
+            print(f"ViT block {i} out min/max/nan:", hidden_states.min().item(), hidden_states.max().item(), torch.isnan(hidden_states).any().item())
 
-        return self.merger(hidden_states)
-
+        out = self.merger(hidden_states)
+        print("ViT merger out min/max/nan:", out.min().item(), out.max().item(), torch.isnan(out).any().item())
+        return out
 
 @add_start_docstrings(
     "The bare Qwen2VL Model outputting raw hidden-states without any specific head on top.",

@@ -16,8 +16,6 @@ from arm_control_base.utils.util_transform import convert_pos_axis_angle_singula
 import torch
 from xarm.wrapper import XArmAPI
 import cv2
-import policy_heads.models.transformer_diffusion.modeling_scaledp
-import policy_heads.models.unet_diffusion.modeling_unet_diffusion
 
 
 #  evaluate the Qwen2 VLA policy in the Agilex environment.
@@ -46,7 +44,9 @@ def process_obs(obs, states, stats):
     cur_state = np.expand_dims(cur_state_np, axis=0)
 
     print("cur_state min/max:", np.min(cur_state), np.max(cur_state))
-
+    print('states.shape', states.shape)
+    print('qpos_mean.shape', stats['qpos_mean'].shape)
+    print('qpos_std.shape', stats['qpos_std'].shape)
     return traj_rgb_np, cur_state # images, states
 
 
@@ -102,22 +102,22 @@ class qwen2_vla_policy:
     
 
     def process_batch_to_qwen2_vla(self, curr_image, robo_state, raw_lang):
-
-        if len(curr_image.shape) == 5:  # 1,2,3,270,480
+        if len(curr_image.shape) == 5:
             curr_image = curr_image.squeeze(0)
 
         messages = self.datastruct_droid2qwen2vla(raw_lang)
-        image_data = torch.chunk(curr_image, curr_image.shape[0], dim=0) 
+        image_data = torch.chunk(curr_image, curr_image.shape[0], dim=0)
         image_list = []
         for i, each in enumerate(image_data):
             ele = {}
             each = Image.fromarray(each.cpu().squeeze(0).permute(1, 2, 0).numpy().astype(np.uint8))
+            # resize to (320, 240) (W, H)
+            each = each.resize((320, 240), resample=Image.BILINEAR)
+            print("inference image shape:", each.size, "min:", np.array(each).min(), "max:", np.array(each).max())
             ele['image'] = each
             ele['resized_height'] = 240
             ele['resized_width'] = 320
-
             image_list.append(torch.from_numpy(np.array(each)))
-        # image_data = image_data / 255.0
         image_data = image_list
         text = self.multimodal_processor.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
@@ -178,6 +178,7 @@ def eval_bc(policy, deploy_env, policy_config, raw_lang=None, query_frequency=16
                 #########################################################
                 image_list.append(traj_rgb_np)
                 robot_state = torch.from_numpy(robot_state).float().cuda()
+                
                 if t % query_frequency == 0:
                     ### 6. Augment the images##############################################################################################
                     curr_image = torch.from_numpy(traj_rgb_np).float().cuda()
@@ -273,6 +274,8 @@ class XArm6DexVLAEnv:
             img_bgr_raw = cv2.cvtColor(imgs_array["color"], cv2.COLOR_RGB2BGR)
             x1, y1, x2, y2 = self.crop_list
             img_bgr = img_bgr_raw[y1:y2, x1:x2]
+            if idx == 0:  # 只保存webcam_1
+                cv2.imwrite("inference_sample.jpg", img_bgr)
             obs[self.camera_names[idx]] = img_bgr
         # robot arm state
         ee_state = np.array(self.arm.get_position_aa(is_radian=True)[1])
@@ -308,16 +311,26 @@ if __name__ == '__main__':
     arm_ip = "192.168.1.235"  # your robot arm IP
     camera_ids = ['webcam_1', 'webcam_2']
     camera_names = ['webcam_1', 'webcam_2']
-    crop_list = [0, 0, 640, 480]  # your actual crop settings
+    crop_list = [700, 200, 1220, 900]  # your actual crop settings
 
     xarm_bot = XArm6DexVLAEnv(arm_ip, camera_ids, camera_names, crop_list)
     # xarm_bot.reset()
 
     #### 3. Load DexVLA####################
     policy = qwen2_vla_policy(policy_config)
+    
+    # print some policy weights for debugging
+    print("ViT block 31 fc1 weight min/max:",
+          policy.policy.visual.blocks[31].mlp.fc1.weight.min().item(),
+          policy.policy.visual.blocks[31].mlp.fc1.weight.max().item())
+    print("ViT block 31 fc2 weight min/max:",
+          policy.policy.visual.blocks[31].mlp.fc2.weight.min().item(),
+          policy.policy.visual.blocks[31].mlp.fc2.weight.max().item())
+
+
     #######################################
     eval_bc(policy, xarm_bot, policy_config, raw_lang=raw_lang, query_frequency=query_frequency)
-    
+    policy.policy.to(dtype=torch.float32)
     # print the first 10 weights of the policy head
     # print(policy.policy.policy_head.blocks[0].mlp.fc1.weight.flatten()[:10])
 
