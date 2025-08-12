@@ -16,60 +16,38 @@ from arm_control_base.utils.util_transform import convert_pos_axis_angle_singula
 import torch
 from xarm.wrapper import XArmAPI
 import cv2
-from transformers import AutoConfig
-from PIL import Image
-
-
-import os, sys
-LOG_PATH = "/home/zekaijin/DexVLA/inference log.log"
-os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
-
-class Tee:
-    def __init__(self, *files): self.files = files
-    def write(self, obj):
-        for f in self.files:
-            f.write(obj)
-            f.flush()
-    def flush(self):
-        for f in self.files:
-            f.flush()
-
-_log_fp = open(LOG_PATH, "a", encoding="utf-8", buffering=1)
-sys.stdout = Tee(sys.stdout, _log_fp)
-sys.stderr = Tee(sys.stderr, _log_fp)
 
 
 #  evaluate the Qwen2 VLA policy in the Agilex environment.
-def pre_process(robot_state_value, key, stats, eps=1e-6, clip=10.0):
-    mean = stats[key + '_mean']
-    std  = stats[key + '_std']
-    tmp = (robot_state_value - mean) / (std + eps)
-    tmp = np.clip(tmp, -clip, clip)  # 避免极端值放大
+def pre_process(robot_state_value, key, stats):
+    tmp = robot_state_value
+    tmp = (tmp - stats[key + '_mean']) / stats[key + '_std']
     return tmp
 
 
+# process observations and states
 def process_obs(obs, states, stats):
     """
-    obs: 两路相机图像（RGB, uint8, 0-255）
-    states: np.ndarray, 机器人状态
-    返回: images[B=1,T=2,C,H,W], states[B,7]
+    obs: three cameras' images
+    states: Tensor, robot states
+    stats: mean, std of robot states and actions
+    This function is used to get observations(images and robot states) in your robot environment.
     """
-    cur_webcam_1 = obs['webcam_1']  # RGB
-    cur_webcam_2 = obs['webcam_2']  # RGB
+    cur_webcam_1 = obs['webcam_1']
+    cur_webcam_2 = obs['webcam_2']
     assert np.max(cur_webcam_1) > 1, "All images must be 0-255."
-
-    traj_rgb_np = np.array([cur_webcam_1, cur_webcam_2])   # [2,H,W,3]
-    traj_rgb_np = np.expand_dims(traj_rgb_np, axis=1)      # [2,1,H,W,3]
-    traj_rgb_np = np.transpose(traj_rgb_np, (1, 0, 4, 2, 3))  # [1,2,3,H,W]
+    traj_rgb_np = np.array([cur_webcam_1, cur_webcam_2]) # sequential must align with constants.py
+    traj_rgb_np = np.expand_dims(traj_rgb_np, axis=1)
+    traj_rgb_np = np.transpose(traj_rgb_np, (1, 0, 4, 2, 3))
 
     cur_state_np = pre_process(states, 'qpos', stats)
-    cur_state = np.expand_dims(cur_state_np, axis=0)       # [1,7]
+    cur_state = np.expand_dims(cur_state_np, axis=0)
 
     print("cur_state min/max:", np.min(cur_state), np.max(cur_state))
     print('states.shape', states.shape)
     print('qpos_mean.shape', stats['qpos_mean'].shape)
     print('qpos_std.shape', stats['qpos_std'].shape)
-    return traj_rgb_np, cur_state
+    return traj_rgb_np, cur_state # images, states
 
 
 def time_ms():
@@ -93,59 +71,10 @@ class qwen2_vla_policy:
             model_base=model_base, 
             policy_config=policy_config
         )
-        # self.tokenizer.add_special_tokens({'additional_special_tokens': ["[SOA]"]})
+        self.tokenizer.add_special_tokens({'additional_special_tokens': ["[SOA]"]})
         
         self.config = AutoConfig.from_pretrained('/'.join(model_path.split('/')[:-1]), trust_remote_code=True)
-        self.policy.policy_head.to(dtype=torch.float32)
-        if hasattr(self.policy, 'input_action_proj'):
-            self.policy.input_action_proj.to(dtype=torch.float32)
-        if hasattr(self.policy, 'reasoning_action_proj'):
-            self.policy.reasoning_action_proj.to(dtype=torch.float32)
-        if hasattr(self.policy, 'reasoning_film'):
-            self.policy.reasoning_film.to(dtype=torch.float32)
-
-        # —— 统一把进入 Linear 的输入 cast 到该层权重的 dtype（防 dtype mismatch）——
-        def _force_linear_input_dtype(mod, args):
-            if not args:
-                return args
-            x = args[0]
-            if torch.is_tensor(x) and hasattr(mod, "weight") and x.dtype != mod.weight.dtype:
-                return (x.to(mod.weight.dtype),)
-            return args
-
-        def _install_linear_dtype_hooks(module):
-            if module is None:
-                return
-            for m in module.modules():
-                if isinstance(m, torch.nn.Linear):
-                    m.register_forward_pre_hook(_force_linear_input_dtype)
-
-        # 对所有可能用到的 FP32 模块安装 hook
-        _install_linear_dtype_hooks(self.policy.policy_head)
-        _install_linear_dtype_hooks(getattr(self.policy, "input_action_proj", None))
-        _install_linear_dtype_hooks(getattr(self.policy, "reasoning_action_proj", None))
-        _install_linear_dtype_hooks(getattr(self.policy, "reasoning_film", None))
-
-        # 若 head 里有 t_embedder（时间步编码），也对输入做 dtype 对齐
-        if hasattr(self.policy.policy_head, "t_embedder"):
-            def _fix_t_emb_dtype(mod, args):
-                if not args:
-                    return args
-                x = args[0]
-                # 用 t_embedder 第一层 Linear 的权重 dtype 作为目标
-                target = None
-                if hasattr(mod, "mlp") and len(mod.mlp) > 0 and hasattr(mod.mlp[0], "weight"):
-                    target = mod.mlp[0].weight.dtype
-                else:
-                    try:
-                        target = next(self.policy.policy_head.parameters()).dtype
-                    except StopIteration:
-                        target = x.dtype
-                if torch.is_tensor(x) and x.dtype != target:
-                    x = x.to(target)
-                return (x,)
-            self.policy.policy_head.t_embedder.register_forward_pre_hook(_fix_t_emb_dtype)
-
+        
 
     def datastruct_droid2qwen2vla(self, raw_lang):
         messages = [
@@ -176,59 +105,51 @@ class qwen2_vla_policy:
     
 
     def process_batch_to_qwen2_vla(self, curr_image, robo_state, raw_lang):
-        """
-        curr_image: torch.Tensor [1,2,3,H,W] (0-255, RGB)
-        robo_state: torch.Tensor [1,7] (已在外面 .float().cuda())
-        """
         if len(curr_image.shape) == 5:
-            curr_image = curr_image.squeeze(0)  # [2,3,H,W]
+            curr_image = curr_image.squeeze(0)
 
         messages = self.datastruct_droid2qwen2vla(raw_lang)
-        frames = torch.chunk(curr_image, curr_image.shape[0], dim=0)  # 2 个 [1,3,H,W]
-
+        image_data = torch.chunk(curr_image, curr_image.shape[0], dim=0)
         image_list = []
-        for each in frames:
-            arr = each.detach().cpu().squeeze(0).permute(1, 2, 0).numpy().astype(np.uint8)  # HWC, RGB
-            pil = Image.fromarray(arr, mode="RGB")
-            pil = pil.resize((320, 240), resample=Image.BILINEAR)  # 训练尺寸 (W=320,H=240)
-            print("inference image shape:", pil.size, "min:", np.array(pil).min(), "max:", np.array(pil).max())
-            image_list.append(pil)  # ✅ 传 PIL
-
+        for i, each in enumerate(image_data):
+            ele = {}
+            each = Image.fromarray(each.cpu().squeeze(0).permute(1, 2, 0).numpy().astype(np.uint8))
+            # resize to (320, 240) (W, H)
+            each = each.resize((320, 240), resample=Image.BILINEAR)
+            print("inference image shape:", each.size, "min:", np.array(each).min(), "max:", np.array(each).max())
+            ele['image'] = each
+            ele['resized_height'] = 240
+            ele['resized_width'] = 320
+            image_list.append(torch.from_numpy(np.array(each)))
+        image_data = image_list
         text = self.multimodal_processor.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
+
+        video_inputs = None
         model_inputs = self.multimodal_processor(
             text=text,
-            images=image_list,
-            videos=None,
+            images=image_data,
+            videos=video_inputs,
             padding=True,
             return_tensors="pt",
         )
-
-        # device / dtype 对齐视觉塔
-        vis_param = next(self.policy.visual.parameters())
-        dev = vis_param.device
-        vis_dtype = vis_param.dtype
-
         data_dict = dict(states=robo_state)
         for k, v in model_inputs.items():
-            if torch.is_tensor(v):
-                v = v.to(dev)
-                if k == "pixel_values":
-                    v = v.to(vis_dtype)
-                data_dict[k] = v
-            else:
-                data_dict[k] = v
+            data_dict[k] = v
         return data_dict
 
 
 def eval_bc(policy, deploy_env, policy_config, raw_lang=None, query_frequency=16):
+        
     assert raw_lang is not None, "raw lang is None!!!!!!"
     set_seed(0)
-    rand_crop_resize = False   # ✅ 推理不做随机裁剪/缩放
+    rand_crop_resize = True
+
     policy.policy.eval()
 
-    stats_path = os.path.join("/".join(policy_config['model_path'].split('/')[:-1]), 'dataset_stats.pkl')
+    ## 4. load data stats(min,max,mean....) and define post_process####################################
+    stats_path = os.path.join("/".join(policy_config['model_path'].split('/')[:-1]), f'dataset_stats.pkl')
     with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
 
@@ -236,51 +157,79 @@ def eval_bc(policy, deploy_env, policy_config, raw_lang=None, query_frequency=16
         post_process = lambda a: a * stats['action_std'] + stats['action_mean']
     elif 'scale_dp_policy' in policy_config["action_head"]:
         post_process = lambda a: ((a + 1) / 2) * (stats['action_max'] - stats['action_min']) + stats['action_min']
-    else:
-        post_process = lambda a: a
+    #############################################################################################################
 
     from collections import deque
     action_queue = deque(maxlen=query_frequency)
-    max_timesteps = int(1000 * 10)
 
-    clip = 10.0  # Define the clip value used for clamping
-    with torch.inference_mode():
-        for t in range(max_timesteps):
-            obs, states = deploy_env.get_obs()
-            traj_rgb_np, robot_state = process_obs(obs, states, stats)
-            robot_state = torch.from_numpy(robot_state).float().cuda()
-            robot_state = torch.nan_to_num(robot_state, posinf=clip, neginf=-clip)
-            robot_state.clamp_(-clip, clip)
+    max_timesteps = int(1000 * 10)  # may increase for real-world tasks
 
-            if t % query_frequency == 0:
-                curr_image = torch.from_numpy(traj_rgb_np).float().cuda()
-                # ❌ 不再做随机增广
-                batch = policy.process_batch_to_qwen2_vla(curr_image, robot_state, raw_lang)
-                if policy_config['tinyvla']:
-                    all_actions, outputs = policy.policy.evaluate_tinyvla(**batch, is_eval=True, tokenizer=policy.tokenizer)
-                else:
-                    all_actions, outputs = policy.policy.evaluate(**batch, is_eval=True, tokenizer=policy.tokenizer)
+    for rollout_id in range(1000):
 
-                while len(action_queue) > 0:
-                    action_queue.popleft()
-                action_queue.extend(torch.chunk(all_actions, chunks=all_actions.shape[1], dim=1)[0:query_frequency])
+        rollout_id += 0
 
-            raw_action = action_queue.popleft()
-            raw_action = raw_action.squeeze(0).cpu().to(dtype=torch.float32).numpy()
-            action = post_process(raw_action)
+        image_list = []  # for visualization
 
-            for k, v in batch.items():
-                if isinstance(v, torch.Tensor):
-                    print(f"batch[{k}] shape: {v.shape}, nan: {torch.isnan(v).any().item() if torch.is_floating_point(v) else 'N/A'}")
+        with torch.inference_mode():
+            time0 = time.time()
+            for t in range(max_timesteps):
 
-            print("all_actions nan:", torch.isnan(all_actions).any().item())
-            print("all_actions shape:", all_actions.shape)
-            print(f"after post_process action size: {action.shape}")
-            print(f'step {t}, pred action: {outputs}{action}')
-            if len(action.shape) == 2:
-                action = action[0]
-            deploy_env.step(action.tolist())
+                obs,states = deploy_env.get_obs()
+                
+                ### 5. Realize the function of get_obs###################
+                traj_rgb_np, robot_state = process_obs(obs, states, stats)
+                #########################################################
+                image_list.append(traj_rgb_np)
+                robot_state = torch.from_numpy(robot_state).float().cuda()
+                
+                if t % query_frequency == 0:
+                    ### 6. Augment the images##############################################################################################
+                    curr_image = torch.from_numpy(traj_rgb_np).float().cuda()
+                    if rand_crop_resize:
+                        print('rand crop resize is used!')
+                        original_size = curr_image.shape[-2:]
+                        ratio = 0.95
+                        curr_image = curr_image[...,
+                                     int(original_size[0] * (1 - ratio) / 2): int(original_size[0] * (1 + ratio) / 2),
+                                     int(original_size[1] * (1 - ratio) / 2): int(original_size[1] * (1 + ratio) / 2)]
+                        curr_image = curr_image.squeeze(0)
+                        resize_transform = transforms.Resize(original_size, antialias=True)
+                        curr_image = resize_transform(curr_image)
+                        curr_image = curr_image.unsqueeze(0)
+                    #######################################################################################################################
 
+                    ###7. Process inputs and predict actions############################################################################################
+                    batch = policy.process_batch_to_qwen2_vla(curr_image, robot_state, raw_lang)
+                    if policy_config['tinyvla']:
+                        all_actions, outputs = policy.policy.evaluate_tinyvla(**batch, is_eval=True, tokenizer=policy.tokenizer)
+                    else:
+                        all_actions, outputs = policy.policy.evaluate(**batch, is_eval=True, tokenizer=policy.tokenizer)
+                    ####################################################################################################################################
+                    # clear previous actions
+                    while len(action_queue) > 0:
+                        action_queue.popleft()
+
+                    action_queue.extend(
+                            torch.chunk(all_actions, chunks=all_actions.shape[1], dim=1)[0:query_frequency])
+
+                raw_action = action_queue.popleft()
+                raw_action = raw_action.squeeze(0).cpu().to(dtype=torch.float32).numpy()
+                ### 8. post process actions##########################################################
+                action = post_process(raw_action)
+                #####################################################################################
+                for k, v in batch.items():
+                    if isinstance(v, torch.Tensor):
+                        print(f"batch[{k}] shape: {v.shape}, nan: {torch.isnan(v).any().item() if torch.is_floating_point(v) else 'N/A'}")
+
+                print("all_actions nan:", torch.isnan(all_actions).any())
+                print("all_actions shape:", all_actions.shape)
+                print(f"after post_process action size: {action.shape}")
+                print(f'step {t}, pred action: {outputs}{action}')
+                if len(action.shape) == 2:
+                    action = action[0]
+                ##### Execute ######################################################################
+                action_info = deploy_env.step(action.tolist())
+                ####################################################################################
 
 # xarm wrapper
 class XArm6DexVLAEnv:
@@ -323,29 +272,24 @@ class XArm6DexVLAEnv:
 
     def get_obs(self):
         obs = {}
-        x1, y1, x2, y2 = self.crop_list
         for idx, cam_id in enumerate(self.camera_ids):
             imgs_array = self.cam_interfaces[cam_id].get_img()
-            img_rgb_raw = imgs_array["color"]
-            img_rgb = img_rgb_raw[y1:y2, x1:x2]
-
-            # 保存每个 webcam 的图片
-            save_path = f"inference_sample_{self.camera_names[idx]}.jpg"
-            cv2.imwrite(save_path, cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR))
-
-            obs[self.camera_names[idx]] = img_rgb
-
-        # 机器人末端位姿（轴角），单位转成米
+            img_bgr_raw = cv2.cvtColor(imgs_array["color"], cv2.COLOR_RGB2BGR)
+            x1, y1, x2, y2 = self.crop_list
+            img_bgr = img_bgr_raw[y1:y2, x1:x2]
+            if idx == 0:  # 只保存webcam_1
+                cv2.imwrite("inference_sample.jpg", img_bgr)
+            obs[self.camera_names[idx]] = img_bgr
+        # robot arm state
         ee_state = np.array(self.arm.get_position_aa(is_radian=True)[1])
-        ee_state[:3] /= 1000.0
-        gripper_state = np.array([1])
+        ee_state[:3] /= 1000.0  # mm→m
+        gripper_state = np.array([1])  # you can get the actual gripper state
         states = np.concatenate([ee_state, gripper_state])
-
         return {
             'webcam_1': obs['webcam_1'],
             'webcam_2': obs['webcam_2'],
-        }, states
 
+        }, states
 
 # ========== XArm6DexVLAEnv ==========
 if __name__ == '__main__':
@@ -402,5 +346,4 @@ if __name__ == '__main__':
     #         print(weights[k].flatten()[:10])
     #         print("Loaded weight shape:", weights[k].shape)
     #         print("policy_head.blocks[0].mlp.fc1.weight nan:", torch.isnan(policy.policy.policy_head.blocks[0].mlp.fc1.weight).any())
-import atexit
-atexit.register(_log_fp.close)
+    
