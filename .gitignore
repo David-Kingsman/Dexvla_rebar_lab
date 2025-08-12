@@ -177,3 +177,5 @@ flash-attention/
 check_hardware.py
 check/
 bitsandbytes/
+*.jpg
+*.log
